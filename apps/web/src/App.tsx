@@ -344,10 +344,10 @@ function RebalanceWorkspace({ portfolio }: { portfolio: PortfolioOverview }) {
         <div className="workspace-input">
           <div className="subsection-heading"><div><p className="eyebrow">TRADE BUILDER</p><strong>添加交易操作</strong></div><span className="panel-meta">按顺序执行</span></div>
           <div className="trade-form">
-            <label>方向<select value={side} onChange={(event) => setSide(event.target.value as TradeSide)}><option value="buy">买入</option><option value="sell">卖出</option></select></label>
-            <label>标的<select value={symbol} onChange={(event) => setSymbol(event.target.value)}>{portfolio.instruments.map((instrument) => <option key={instrument.symbol} value={instrument.symbol}>{instrument.symbol} · {instrument.name}</option>)}</select></label>
-            <label>数量<input type="number" min="1" step="1" value={quantity} onChange={(event) => setQuantity(event.target.value)} placeholder="正整数" /></label>
-            <button type="button" className="button button--secondary" aria-label="加入操作" onClick={addOperation}><span aria-hidden="true">＋</span> 加入操作</button>
+            <label>方向<select data-testid="trade-side" value={side} onChange={(event) => setSide(event.target.value as TradeSide)}><option value="buy">买入</option><option value="sell">卖出</option></select></label>
+            <label>标的<select data-testid="trade-symbol" value={symbol} onChange={(event) => setSymbol(event.target.value)}>{portfolio.instruments.map((instrument) => <option key={instrument.symbol} value={instrument.symbol}>{instrument.symbol} · {instrument.name}</option>)}</select></label>
+            <label>数量<input data-testid="trade-quantity" type="number" min="1" step="1" value={quantity} onChange={(event) => setQuantity(event.target.value)} placeholder="正整数" /></label>
+            <button type="button" data-testid="add-operation" className="button button--secondary" aria-label="加入操作" onClick={addOperation}><span aria-hidden="true">＋</span> 加入操作</button>
           </div>
           {formError && <p className="inline-error" role="alert">{formError}</p>}
 
@@ -359,7 +359,7 @@ function RebalanceWorkspace({ portfolio }: { portfolio: PortfolioOverview }) {
             }) : <div className="empty-operation"><span aria-hidden="true">＋</span><p>添加操作后，模拟结果会显示在这里。</p></div>}
           </div>
 
-          <div className="simulation-actions"><button type="button" className="button button--primary" aria-label="提交模拟" onClick={submitSimulation} disabled={submitting}>{submitting ? <><span className="button-spinner" aria-hidden="true" />处理中…</> : <><span aria-hidden="true">▶</span> 提交模拟</>}</button>{simulationError && <p className="inline-error" role="alert">{simulationError}</p>}</div>
+          <div className="simulation-actions"><button type="button" data-testid="submit-simulation" className="button button--primary" aria-label="提交模拟" onClick={submitSimulation} disabled={submitting}>{submitting ? <><span className="button-spinner" aria-hidden="true" />处理中…</> : <><span aria-hidden="true">▶</span> 提交模拟</>}</button>{simulationError && <p className="inline-error" role="alert">{simulationError}</p>}</div>
         </div>
         <aside className="workspace-hint"><span className="hint-icon" aria-hidden="true">i</span><div><strong>模拟规则</strong><p>买入会减少现金，卖出会增加现金。任意一笔操作失败时，整批模拟不会生效。</p></div></aside>
       </div>
@@ -368,7 +368,7 @@ function RebalanceWorkspace({ portfolio }: { portfolio: PortfolioOverview }) {
 
       <div className="scenario-save-row">
         <div><p className="eyebrow">SAVE SCENARIO</p><strong>保存当前方案</strong><span className="save-helper">仅保存快照、操作列表和方案名称</span></div>
-        <input aria-label="方案名称" value={saveName} onChange={(event) => setSaveName(event.target.value)} placeholder="例如：降低科技集中度" disabled={!simulation || simulationStale || submitting} />
+        <input data-testid="scenario-name" aria-label="方案名称" value={saveName} onChange={(event) => setSaveName(event.target.value)} placeholder="例如：降低科技集中度" disabled={!simulation || simulationStale || submitting} />
         <button type="button" className="button button--secondary" aria-label="保存方案" onClick={saveCurrentScenario} disabled={!simulation || simulationStale || submitting}>保存方案</button>
       </div>
       {saveMessage && <p className="inline-message" role="status">{saveMessage}</p>}

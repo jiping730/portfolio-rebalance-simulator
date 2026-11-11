@@ -11,13 +11,21 @@
 npm.cmd test
 ```
 
-实际结果：通过。服务端 8 个测试文件、29 个测试通过；前端 1 个测试文件、1 个测试通过，共 30/30 通过。
+实际结果：通过。服务端 8 个测试文件、29 个测试通过；前端 1 个测试文件、3 个交互测试通过，共 32/32 通过。
+
+前端交互测试覆盖：初始概览和集中度提醒、添加两笔操作并提交模拟、第二笔失败后保留上一次成功结果并禁用保存、方案保存和重新打开。
 
 ```text
 npm.cmd run build
 ```
 
 实际结果：通过。服务端 TypeScript 编译通过；前端 TypeScript 检查和 Vite 生产构建通过，生成 `apps/web/dist`。
+
+```text
+npm.cmd run verify:browser
+```
+
+实际结果：通过，退出码为 `0`。Chrome 155 Headless 通过 CDP 完成初始页面、AC-03 模拟、第二笔失败反馈、方案保存和重新打开四段流程，并重新生成四张截图。
 
 新增验收测试位于 `apps/server/src/acceptance.test.ts`，使用临时方案目录，不污染默认 `apps/server/data/scenarios.json`。
 
@@ -29,17 +37,17 @@ npm.cmd run build
 | AC-02 | 卖出 A01 100 股，检查 30%/50% 边界 | 通过：现金 `30000.00`，A01 `30.00%`、科技 `50.00%`，均不告警 |
 | AC-03 | 继续买入 A02 100 股，检查顺序、告警和守恒 | 通过：现金 `25000.00`，A02 `500` 股、`25000.00`，科技 `55.00%` 告警，总资产守恒 |
 | AC-04 | 买入 201、卖出 401、零、负数、小数 | 通过：全部返回 400 错误，无部分模拟结果 |
-| AC-05 | 保存、停止并重启服务后列表与重开、守恒和原始组合隔离 | 通过：新 `ScenarioRepository` 实例重启服务后仍列出相同方案 ID、2 笔操作；现金 `25000.00`，A01/A02 为 `300/500` 股，科技行业 `55.00%` 超限，总资产 `100000.00 → 100000.00` 守恒；原始现金仍为 `20000.00` |
+| AC-05 | 保存、停止并重启服务后列表与重开、守恒和原始组合隔离 | 通过：同一测试进程内重新创建服务实例和 `ScenarioRepository` 后仍列出相同方案 ID、2 笔操作；现金 `25000.00`，A01/A02 为 `300/500` 股，科技行业 `55.00%` 超限，总资产 `100000.00 → 100000.00` 守恒；原始现金仍为 `20000.00` |
 
 同一批测试还覆盖了非法标的、非法方向、现金不足、未知方案、非法 JSON、空方案名和整批原子回滚。
 
 ### 2.1 AC-05 重启恢复验证
 
-自动化测试在 `apps/server/src/acceptance.test.ts` 中先通过服务实例 A 保存 AC-03 方案，然后停止 HTTP 服务；服务实例 B 使用新的 `ScenarioRepository` 实例读取同一个临时 `scenarios.json` 并重新启动。随后验证方案列表中的 `scenarioId` 与保存响应一致、`operationCount` 为 `2`，重开结果包含现金 `25000.00`、A01 为 `300` 股、A02 为 `500` 股、科技行业市值 `55000.00`、占比 `55.00%`、阈值 `50.00%` 且状态超限，同时核对总资产守恒字段均为 `100000.00`。
+自动化测试在 `apps/server/src/acceptance.test.ts` 中先通过服务实例 A 保存 AC-03 方案，然后停止 HTTP 服务；服务实例 B 使用新的 `ScenarioRepository` 实例读取同一个临时 `scenarios.json` 并重新启动。这里的 A/B 是同一 Vitest Node 进程内创建的 HTTP 服务实例，不是独立操作系统进程。随后验证方案列表中的 `scenarioId` 与保存响应一致、`operationCount` 为 `2`，重开结果包含现金 `25000.00`、A01 为 `300` 股、A02 为 `500` 股、科技行业市值 `55000.00`、占比 `55.00%`、阈值 `50.00%` 且状态超限，同时核对总资产守恒字段均为 `100000.00`。
 
 独立的 `scenario-repository.test.ts` 还验证了新 `ScenarioRepository` 实例的 `list`/`findById` 读取。两个测试的临时 `scenarios.json` 在清理阶段均写回 `[]` 后删除；默认 `apps/server/data/scenarios.json` 未被测试污染，测试结束后仍为空数组。
 
-实际执行结果：`npm.cmd test` 中 AC-05 在服务实例 A 保存后关闭服务，再以新的 `ScenarioRepository` 启动服务实例 B；列表和重开请求均返回 `200`，方案 ID 保持一致，详情中的两笔规范化操作和全部计算字段符合上表。测试结束后默认 `apps/server/data/scenarios.json` 实际检查为 `[]`。
+实际执行结果：`npm.cmd test` 中 AC-05 在服务实例 A 保存后关闭服务，再以新的 `ScenarioRepository` 启动服务实例 B；列表和重开请求均返回 `200`，方案 ID 保持一致，详情中的两笔规范化操作和全部计算字段符合上表。测试结束后默认 `apps/server/data/scenarios.json` 实际检查为 `[]`。独立 OS 进程重启未纳入本次验证。
 
 ## 3. 浏览器验证
 
@@ -58,15 +66,17 @@ npm.cmd run build
 在前后端开发服务已启动、Chrome 以 `9222` 端口远程调试时执行：
 
 ```text
-node scripts/verify-browser.mjs
+npm.cmd run verify:browser
 ```
 
-脚本通过 Chrome DevTools Protocol 实际执行并断言：初始页面的 2 项集中度提醒；卖出 A01 100 股、买入 A02 100 股、提交模拟和行业集中度对比；第一次模拟成功后第二笔超卖失败时错误中文提示、`第 2 笔操作失败`、`role="alert"`、旧结果保留、过期提示和保存禁用；成功保存方案后重新打开并核对两笔操作和总资产守恒。脚本生成以下四张截图，并在 `finally` 中将默认 `apps/server/data/scenarios.json` 恢复为 `[]`：
+脚本通过 Chrome DevTools Protocol 实际执行并断言：初始页面的 2 项集中度提醒；卖出 A01 100 股、买入 A02 100 股、提交模拟和行业集中度对比；第一次模拟成功后第二笔超卖失败时错误中文提示、`第 2 笔操作失败`、`role="alert"`、旧结果保留、过期提示和保存禁用；成功保存方案后重新打开并核对两笔操作和总资产守恒。脚本使用 `data-testid` 定位表单控件、使用 `aria-label` 定位操作按钮，等待异步页面状态最多 20 秒，并在 `finally` 中恢复运行前的方案文件内容。本次实际退出码为 `0`，生成以下四张截图：
 
 - `screenshots/overview.png`
 - `screenshots/simulation-comparison.png`
 - `screenshots/error-feedback.png`
 - `screenshots/scenario-reopened.png`
+
+本次运行前后的 `apps/server/data/scenarios.json` 均为空数组 `[]`。
 
 ### 3.2 调仓校验错误反馈
 
@@ -91,12 +101,13 @@ node scripts/verify-browser.mjs
 
 - `PLAN.md` 保留为开发前的初始方案，没有用最终实现结果覆盖原始计划。
 - `DESIGN.md` 的字段、阈值、接口响应、原子性和保存策略与当前源码及测试一致。
-- README 中的安装、启动、测试、构建命令与 `package.json` workspace 脚本一致。
+- README 中的安装、启动、测试、构建和 `npm run verify:browser` 命令与 `package.json` 脚本一致。
 - 截图中的金额、持仓变化和方案名称均来自本次实际浏览器操作。
 
 ## 6. 未覆盖项和已知问题
 
 - 未配置 CI、外部部署或真实行情服务；本项目定位是本地可运行原型。
 - 未进行不同浏览器和移动端的人工视觉回归；当前仅验证本机 Chrome 的桌面视口。
+- AC-05 验证的是同一 Node 进程内的服务实例和仓储实例重建，未验证独立操作系统进程完全退出后再启动。
 - JSON 仓储只在单进程内串行写入，没有跨进程锁；多实例同时写入不在本次范围内。
 - 页面不提供方案编辑和删除功能，重开只允许从固定快照重新计算。

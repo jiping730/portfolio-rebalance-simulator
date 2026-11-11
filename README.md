@@ -75,10 +75,12 @@ npm test
 npm run build
 
 # 需要本地 Chrome 以 9222 端口远程调试，并已启动前后端服务
-node scripts/verify-browser.mjs
+npm run verify:browser
 ```
 
 本项目不包含真实交易服务或生产服务器启动脚本；`build` 用于验证可编译和生成前端 `dist` 产物，开发环境按上面的两个命令启动即可。
+
+浏览器验收需要 Chrome/Chromium 以远程调试端口 `9222` 启动；脚本会实际操作页面、生成四张截图，并在结束时恢复方案文件原内容。
 
 ## 核心操作流程
 

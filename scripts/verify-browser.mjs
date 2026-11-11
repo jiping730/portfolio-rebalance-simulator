@@ -1,10 +1,19 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
 const cdpEndpoint = process.env.CDP_ENDPOINT ?? 'http://127.0.0.1:9222';
 const appUrl = process.env.APP_URL ?? 'http://127.0.0.1:5173';
 const screenshotDirectory = resolve('docs/screenshots');
 const scenarioFile = resolve(process.env.SCENARIO_FILE ?? 'apps/server/data/scenarios.json');
+const waitTimeoutAttempts = 200;
+const pollIntervalMilliseconds = 100;
+
+const selectors = {
+  tradeSide: '[data-testid="trade-side"]',
+  tradeSymbol: '[data-testid="trade-symbol"]',
+  tradeQuantity: '[data-testid="trade-quantity"]',
+  scenarioName: '[data-testid="scenario-name"]',
+};
 
 const targets = await (await fetch(`${cdpEndpoint}/json/list`)).json();
 const target = targets.find((item) => item.type === 'page' && item.url.includes(new URL(appUrl).host))
@@ -47,13 +56,13 @@ function pageFunction(functionBody, ...args) {
 }
 
 async function waitForApp() {
-  const loaded = await evaluate(`(${async function waitForPage() {
-    for (let attempt = 0; attempt < 100; attempt += 1) {
+  const loaded = await evaluate(pageFunction(async function waitForPage(maxAttempts, interval) {
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
       if (document.querySelector('.trade-form')) return true;
-      await new Promise((resolvePromise) => setTimeout(resolvePromise, 100));
+      await new Promise((resolvePromise) => setTimeout(resolvePromise, interval));
     }
     return false;
-  }})()`);
+  }, waitTimeoutAttempts, pollIntervalMilliseconds));
   if (!loaded) throw new Error('页面未加载调仓表单');
 }
 
@@ -85,17 +94,17 @@ async function clickButton(label) {
 }
 
 async function addOperation(side, symbol, quantity) {
-  await setFormValue('.trade-form label:nth-child(1) select', side);
-  await setFormValue('.trade-form label:nth-child(2) select', symbol);
-  await setFormValue('.trade-form input[type="number"]', quantity);
+  await setFormValue(selectors.tradeSide, side);
+  await setFormValue(selectors.tradeSymbol, symbol);
+  await setFormValue(selectors.tradeQuantity, quantity);
   await clickButton('加入操作');
-  await sleep(120);
+  await sleep(200);
 }
 
 async function submitSimulation() {
   await clickButton('提交模拟');
-  const state = await evaluate(`(${async function waitForSimulation() {
-    for (let attempt = 0; attempt < 100; attempt += 1) {
+  const state = await evaluate(pageFunction(async function waitForSimulation(maxAttempts, interval) {
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
       const button = document.querySelector('.simulation-actions button');
       const alert = document.querySelector('.inline-error[role="alert"]');
       if (button && !button.disabled && (alert || document.querySelector('.comparison-area'))) {
@@ -104,10 +113,10 @@ async function submitSimulation() {
           hasComparison: Boolean(document.querySelector('.comparison-area')),
         };
       }
-      await new Promise((resolvePromise) => setTimeout(resolvePromise, 100));
+      await new Promise((resolvePromise) => setTimeout(resolvePromise, interval));
     }
     throw new Error('模拟请求未在预期时间内完成');
-  }})()`);
+  }, waitTimeoutAttempts, pollIntervalMilliseconds));
   return state;
 }
 
@@ -142,6 +151,7 @@ function assertIncludes(text, expected, context) {
 }
 
 await mkdir(screenshotDirectory, { recursive: true });
+const originalScenarioContent = await readFile(scenarioFile, 'utf8').catch(() => '[]\n');
 await writeFile(scenarioFile, '[]\n', 'utf8');
 
 try {
@@ -196,26 +206,26 @@ try {
   await addOperation('sell', 'A01', 100);
   await addOperation('buy', 'A02', 100);
   await submitSimulation();
-  await setFormValue('.scenario-save-row input', '浏览器交互验收方案');
+  await setFormValue(selectors.scenarioName, '浏览器交互验收方案');
   await clickButton('保存方案');
-  const saved = await evaluate(`(${async function waitForSavedScenario() {
-    for (let attempt = 0; attempt < 100; attempt += 1) {
+  const saved = await evaluate(pageFunction(async function waitForSavedScenario(maxAttempts, interval) {
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
       const message = document.querySelector('.inline-message')?.textContent?.trim() ?? '';
       if (message.includes('已保存')) return message;
-      await new Promise((resolvePromise) => setTimeout(resolvePromise, 100));
+      await new Promise((resolvePromise) => setTimeout(resolvePromise, interval));
     }
     throw new Error('方案未保存成功');
-  }})()`);
+  }, waitTimeoutAttempts, pollIntervalMilliseconds));
   assertIncludes(saved, '浏览器交互验收方案', '方案保存');
   await clickButton('重新打开');
-  const reopened = await evaluate(`(${async function waitForReopenedScenario() {
-    for (let attempt = 0; attempt < 100; attempt += 1) {
+  const reopened = await evaluate(pageFunction(async function waitForReopenedScenario(maxAttempts, interval) {
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
       const message = document.querySelector('.inline-message')?.textContent?.trim() ?? '';
       if (message.includes('已重新打开')) return { message, operationCount: document.querySelectorAll('.operation-row').length, text: document.body.innerText };
-      await new Promise((resolvePromise) => setTimeout(resolvePromise, 100));
+      await new Promise((resolvePromise) => setTimeout(resolvePromise, interval));
     }
     throw new Error('方案未重新打开成功');
-  }})()`);
+  }, waitTimeoutAttempts, pollIntervalMilliseconds));
   assertIncludes(reopened.message, '浏览器交互验收方案', '方案重开');
   if (reopened.operationCount !== 2) throw new Error('方案重开后的操作数量不是 2');
   assertIncludes(reopened.text, '总资产守恒：100000.00 → 100000.00', '方案重开');
@@ -223,6 +233,6 @@ try {
 
   console.log(JSON.stringify({ initial, simulation, error, reopened }, null, 2));
 } finally {
-  await writeFile(scenarioFile, '[]\n', 'utf8');
+  await writeFile(scenarioFile, originalScenarioContent, 'utf8');
   if (socket) socket.close();
 }
