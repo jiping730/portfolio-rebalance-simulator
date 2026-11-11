@@ -5,3 +5,8 @@ coverage/
 .env.*
 !.env.example
 
+# 本地参考资料和 AI 交互记录，不纳入项目交付
+.workbuddy/
+.codex
+度小满｜全栈开发实习岗位技术测评邀请/
+

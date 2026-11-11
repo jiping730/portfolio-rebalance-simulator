@@ -67,6 +67,9 @@ apps/server/src/api                   Express API 与统一错误处理
 apps/server/src/repository            JSON 方案仓储
 apps/web/src                          React 页面和 API 客户端
 scripts/verify-browser.mjs            Chrome/CDP 交互验收与截图脚本
+docs/PLAN.md                          开发前初始方案
+docs/DESIGN.md                        设计与交付说明
+docs/VERIFY.md                        验证记录
 docs/screenshots                      关键页面验证截图
 ```
 
@@ -74,9 +77,9 @@ docs/screenshots                      关键页面验证截图
 
 ## 验证材料
 
-- [验证记录](VERIFY.md)：自动化测试、AC-01～AC-05、浏览器操作和已知问题。
-- [设计与交付说明](DESIGN.md)：需求拆解、接口、关键取舍、AI 协作记录和复盘。
-- [初始开工方案](PLAN.md)：开发前保留的范围、技术选择和验证计划。
+- [验证记录](docs/VERIFY.md)：自动化测试、AC-01～AC-05、浏览器操作和已知问题。
+- [设计与交付说明](docs/DESIGN.md)：需求拆解、接口、关键取舍、AI 协作记录和复盘。
+- [初始开工方案](docs/PLAN.md)：开发前保留的范围、技术选择和验证计划。
 - [概览截图](docs/screenshots/overview.png)
 - [调仓结果截图](docs/screenshots/simulation-comparison.png)
 - [错误反馈截图](docs/screenshots/error-feedback.png)

@@ -382,7 +382,9 @@ GET /api/scenarios/:scenarioId
 
 AI 生成代码必须经过单元测试、手工复算 AC-01～AC-03、实际浏览器操作三重核验。重点检查是否误用四舍五入比较、是否修改原始组合、是否部分提交失败交易、是否把派生结果写入持久化文件。
 
-## 9. AI 协作记录（摘要；完整记录见 `.codex`）
+## 9. AI 协作记录（摘要；完整本地记录见根目录 `.codex`）
+
+本节保留可提交的关键交互摘要；根目录 `.codex` 为本地辅助记录，已按交付要求排除在 Git 之外。
 
 工具：Codex（Codex Desktop，GPT-5）。以下记录保留当前实现阶段的关键上下文和摘要，不替代完整对话记录。
 
@@ -449,7 +451,7 @@ AI 生成代码必须经过单元测试、手工复算 AC-01～AC-03、实际浏
 ### 9.10 验收测试、浏览器验证与交付文档（步骤 15～18 历史记录）
 
 - 提供的上下文与完成标准：依据 PLAN.md、DESIGN.md 和 AC-01～AC-05，补充自动化验收测试，实际检查概览、调仓、保存和重开流程，生成关键页面截图，并完成 README、VERIFY 和本文档的事实记录；提交信息要求为 `test: verify acceptance cases and complete delivery docs`。
-- AI 实际产出：新增 `apps/server/src/acceptance.test.ts`，覆盖 AC-01～AC-05；新增 `README.md`、`VERIFY.md` 和 `docs/screenshots/overview.png`、`simulation-comparison.png`、`scenario-reopened.png`；补充本节、完成情况和检查清单；同时将本轮关键交互摘要写入 `.codex`。
+- AI 实际产出：新增 `apps/server/src/acceptance.test.ts`，覆盖 AC-01～AC-05；新增 `README.md`、`docs/VERIFY.md` 和 `screenshots/overview.png`、`simulation-comparison.png`、`scenario-reopened.png`；补充本节、完成情况和检查清单；同时将本轮关键交互摘要写入本地 `.codex`。
 - 检查方法：步骤 15～18 当时执行 `npm.cmd test`，服务端 7 个测试文件 28 个测试、前端 1 个测试全部通过，共 29/29；执行 `npm.cmd run build`，服务端 TypeScript 编译和前端 Vite 构建均通过。启动本地前后端后用 Chrome 155 Headless 访问 `http://127.0.0.1:5173`，实际执行卖出 A01 100 股、买入 A02 100 股、提交、保存和重新打开，核对 DOM 文本与截图。后续测试数量和交互覆盖以 9.13、9.14 及 VERIFY.md 的当前记录为准。
 - 实际核验结果：初始页面显示总资产 `100000.00`、现金 `20000.00` 和 2 项告警；模拟后现金为 `25000.00`、科技行业为 `55.00%`、总资产守恒；保存后列表有 1 个方案，重开后仍有 2 笔操作且守恒提示保持不变。浏览器验证结束后恢复了默认 `apps/server/data/scenarios.json` 的空数组。
 - 采用依据与修改：保留后端唯一计算口径和本地 JSON 仓储；将自动化验收作为 AC 证据，将截图和命令输出作为交付证据；未把浏览器临时方案或未实现的 CI、部署、编辑删除功能写成已完成项。
@@ -480,7 +482,7 @@ AI 生成代码必须经过单元测试、手工复算 AC-01～AC-03、实际浏
 ### 9.14 前端交互验收与截图补充
 
 - 提供的上下文与完成标准：增强前端交互测试或浏览器验证脚本，覆盖初始集中度提醒、添加买卖操作、提交模拟、模拟结果、错误后保留成功结果、保存和重开，并更新初始组合、调仓对比、错误反馈和方案重开的截图。
-- AI 实际产出：新增 `scripts/verify-browser.mjs`，通过 Chrome DevTools Protocol 统一执行四条页面流程并对关键文本、操作数量、错误 `role`、旧结果、保存状态和重开提示进行断言；新增 `docs/screenshots/error-feedback.png`，并重新生成其余三张页面截图。
+- AI 实际产出：新增 `scripts/verify-browser.mjs`，通过 Chrome DevTools Protocol 统一执行四条页面流程并对关键文本、操作数量、错误 `role`、旧结果、保存状态和重开提示进行断言；新增 `screenshots/error-feedback.png`，并重新生成其余三张页面截图。
 - 检查方法：启动前后端服务和 Chrome 155 Headless，执行 `node scripts/verify-browser.mjs`；脚本实际检查“2 项超限”、AC-03 的 `55.00%` 行业结果、第二笔超卖错误、保存成功和方案重开，并由 `view_image` 对四张截图进行视觉核对。
 - 实际核验结果：脚本执行成功，初始、模拟、错误反馈、方案重开四个阶段均通过；错误阶段保留成功对比区并禁用保存，重开阶段保留 2 笔操作和 `100000.00 → 100000.00` 守恒提示；脚本结束后默认 `scenarios.json` 恢复为空数组。
 - 采用或修改依据：用页面行为断言补足仅有后端接口测试的盲区；截图只记录本次真实页面状态，不把测试临时方案作为持久化交付数据。
