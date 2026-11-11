@@ -1,4 +1,5 @@
 export type MoneyString = string;
+export type PercentageString = string;
 export type RatioString = string;
 export type Currency = 'CNY';
 export type ComparisonRule = 'strictly_greater_than';
@@ -61,6 +62,44 @@ export interface PortfolioSnapshot {
   cash: MoneyString;
   instruments: Instrument[];
   rules: PortfolioRules;
+}
+
+export type ConcentrationAlertType = 'instrument' | 'industry';
+
+export interface ConcentrationAlert {
+  type: ConcentrationAlertType;
+  key: string;
+  label: string;
+  ratioPercent: PercentageString;
+  thresholdPercent: PercentageString;
+}
+
+export interface InstrumentAnalysis extends Instrument {
+  marketValue: MoneyString;
+  ratioPercent: PercentageString;
+  isOverThreshold: boolean;
+  thresholdPercent: PercentageString;
+}
+
+export interface IndustryAnalysis {
+  industry: string;
+  marketValue: MoneyString;
+  ratioPercent: PercentageString;
+  isOverThreshold: boolean;
+  thresholdPercent: PercentageString;
+}
+
+export interface PortfolioSummary {
+  totalAsset: MoneyString;
+  cash: MoneyString;
+  holdingCount: number;
+  alerts: ConcentrationAlert[];
+}
+
+export interface PortfolioAnalysis {
+  summary: PortfolioSummary;
+  instruments: InstrumentAnalysis[];
+  industries: IndustryAnalysis[];
 }
 
 export interface TradeOperationInput {
