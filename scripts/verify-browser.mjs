@@ -56,14 +56,14 @@ function pageFunction(functionBody, ...args) {
 }
 
 async function waitForApp() {
-  const loaded = await evaluate(pageFunction(async function waitForPage(maxAttempts, interval) {
+  const loaded = await evaluate(pageFunction(async function waitForPage(maxAttempts, interval, requiredSelectors) {
     for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-      if (document.querySelector('.trade-form')) return true;
+      if (requiredSelectors.every((selector) => document.querySelector(selector))) return true;
       await new Promise((resolvePromise) => setTimeout(resolvePromise, interval));
     }
     return false;
-  }, waitTimeoutAttempts, pollIntervalMilliseconds));
-  if (!loaded) throw new Error('页面未加载调仓表单');
+  }, waitTimeoutAttempts, pollIntervalMilliseconds, Object.values(selectors)));
+  if (!loaded) throw new Error('页面未加载完整调仓表单');
 }
 
 async function reloadAndWait() {
