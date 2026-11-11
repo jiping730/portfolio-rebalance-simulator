@@ -76,7 +76,9 @@ async function setFormValue(selector, value) {
 
 async function clickButton(label) {
   await evaluate(pageFunction(function clickButtonByLabel(buttonLabel) {
-    const button = [...document.querySelectorAll('button')].find((item) => item.textContent?.trim() === buttonLabel);
+    const button = [...document.querySelectorAll('button')].find((item) =>
+      item.getAttribute('aria-label') === buttonLabel || item.textContent?.trim() === buttonLabel,
+    );
     if (!button) throw new Error(`找不到按钮：${buttonLabel}`);
     button.click();
   }, label));

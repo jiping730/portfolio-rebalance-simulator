@@ -347,7 +347,7 @@ function RebalanceWorkspace({ portfolio }: { portfolio: PortfolioOverview }) {
             <label>方向<select value={side} onChange={(event) => setSide(event.target.value as TradeSide)}><option value="buy">买入</option><option value="sell">卖出</option></select></label>
             <label>标的<select value={symbol} onChange={(event) => setSymbol(event.target.value)}>{portfolio.instruments.map((instrument) => <option key={instrument.symbol} value={instrument.symbol}>{instrument.symbol} · {instrument.name}</option>)}</select></label>
             <label>数量<input type="number" min="1" step="1" value={quantity} onChange={(event) => setQuantity(event.target.value)} placeholder="正整数" /></label>
-            <button type="button" className="button button--secondary" onClick={addOperation}><span aria-hidden="true">＋</span> 加入操作</button>
+            <button type="button" className="button button--secondary" aria-label="加入操作" onClick={addOperation}><span aria-hidden="true">＋</span> 加入操作</button>
           </div>
           {formError && <p className="inline-error" role="alert">{formError}</p>}
 
@@ -359,7 +359,7 @@ function RebalanceWorkspace({ portfolio }: { portfolio: PortfolioOverview }) {
             }) : <div className="empty-operation"><span aria-hidden="true">＋</span><p>添加操作后，模拟结果会显示在这里。</p></div>}
           </div>
 
-          <div className="simulation-actions"><button type="button" className="button button--primary" onClick={submitSimulation} disabled={submitting}>{submitting ? <><span className="button-spinner" aria-hidden="true" />处理中…</> : <><span aria-hidden="true">▶</span> 提交模拟</>}</button>{simulationError && <p className="inline-error" role="alert">{simulationError}</p>}</div>
+          <div className="simulation-actions"><button type="button" className="button button--primary" aria-label="提交模拟" onClick={submitSimulation} disabled={submitting}>{submitting ? <><span className="button-spinner" aria-hidden="true" />处理中…</> : <><span aria-hidden="true">▶</span> 提交模拟</>}</button>{simulationError && <p className="inline-error" role="alert">{simulationError}</p>}</div>
         </div>
         <aside className="workspace-hint"><span className="hint-icon" aria-hidden="true">i</span><div><strong>模拟规则</strong><p>买入会减少现金，卖出会增加现金。任意一笔操作失败时，整批模拟不会生效。</p></div></aside>
       </div>
@@ -369,13 +369,13 @@ function RebalanceWorkspace({ portfolio }: { portfolio: PortfolioOverview }) {
       <div className="scenario-save-row">
         <div><p className="eyebrow">SAVE SCENARIO</p><strong>保存当前方案</strong><span className="save-helper">仅保存快照、操作列表和方案名称</span></div>
         <input aria-label="方案名称" value={saveName} onChange={(event) => setSaveName(event.target.value)} placeholder="例如：降低科技集中度" disabled={!simulation || simulationStale || submitting} />
-        <button type="button" className="button button--secondary" onClick={saveCurrentScenario} disabled={!simulation || simulationStale || submitting}>保存方案</button>
+        <button type="button" className="button button--secondary" aria-label="保存方案" onClick={saveCurrentScenario} disabled={!simulation || simulationStale || submitting}>保存方案</button>
       </div>
       {saveMessage && <p className="inline-message" role="status">{saveMessage}</p>}
 
       <div className="scenario-list">
         <div className="operation-list-heading"><div><p className="eyebrow">SAVED SCENARIOS</p><strong>已保存方案</strong></div><span className="queue-count">{scenarios.length} 个</span></div>
-        {loadingScenarios ? <div className="empty-operation"><span className="button-spinner button-spinner--dark" aria-hidden="true" /><p>正在加载方案列表…</p></div> : scenarioError ? <p className="inline-error" role="alert">{scenarioError}</p> : scenarios.length === 0 ? <div className="empty-operation"><span aria-hidden="true">▱</span><p>暂无保存方案，完成模拟后可以在这里留存方案。</p></div> : scenarios.map((scenario) => <div className="scenario-row" key={scenario.scenarioId}><div><strong>{scenario.name}</strong><span>{scenario.operationCount} 笔操作 · {formatSnapshotTime(scenario.createdAt)}</span></div><button type="button" className="button button--ghost" onClick={() => reopenScenario(scenario.scenarioId)} disabled={openingScenario !== null}>{openingScenario === scenario.scenarioId ? '打开中…' : '重新打开'}</button></div>)}
+        {loadingScenarios ? <div className="empty-operation"><span className="button-spinner button-spinner--dark" aria-hidden="true" /><p>正在加载方案列表…</p></div> : scenarioError ? <p className="inline-error" role="alert">{scenarioError}</p> : scenarios.length === 0 ? <div className="empty-operation"><span aria-hidden="true">▱</span><p>暂无保存方案，完成模拟后可以在这里留存方案。</p></div> : scenarios.map((scenario) => <div className="scenario-row" key={scenario.scenarioId}><div><strong>{scenario.name}</strong><span>{scenario.operationCount} 笔操作 · {formatSnapshotTime(scenario.createdAt)}</span></div><button type="button" className="button button--ghost" aria-label="重新打开" onClick={() => reopenScenario(scenario.scenarioId)} disabled={openingScenario !== null}>{openingScenario === scenario.scenarioId ? '打开中…' : '重新打开'}</button></div>)}
       </div>
     </section>
   );
@@ -391,7 +391,7 @@ function OverviewPage({ data, onRefresh }: { data: PortfolioOverview; onRefresh:
           <h1>投资组合分析</h1>
         </div>
         <div className="topbar-context"><span className="live-dot" aria-hidden="true" />固定快照模式</div>
-        <button type="button" className="button button--ghost" onClick={onRefresh}>刷新数据</button>
+        <button type="button" className="button button--ghost" aria-label="刷新数据" onClick={onRefresh}>刷新数据</button>
       </header>
       <section className="hero-card">
         <div className="hero-copy">
