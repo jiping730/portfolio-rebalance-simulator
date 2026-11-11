@@ -102,6 +102,19 @@ export interface PortfolioAnalysis {
   industries: IndustryAnalysis[];
 }
 
+export interface SimulationInvariant {
+  originalTotalAsset: MoneyString;
+  simulatedTotalAsset: MoneyString;
+  isPreserved: boolean;
+}
+
+export interface RebalanceSimulationResult {
+  operations: TradeOperation[];
+  original: PortfolioAnalysis;
+  simulated: PortfolioAnalysis;
+  invariant: SimulationInvariant;
+}
+
 export interface TradeOperationInput {
   side: TradeSide;
   symbol: string;
