@@ -1,13 +1,7 @@
-import express from 'express';
+import { createApp } from './api/app.js';
 
-const app = express();
+const app = createApp();
 const port = Number(process.env.PORT ?? 3000);
-
-app.use(express.json());
-
-app.get('/health', (_request, response) => {
-  response.json({ status: 'ok' });
-});
 
 if (process.env.NODE_ENV !== 'test') {
   app.listen(port, () => {
