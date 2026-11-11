@@ -58,3 +58,10 @@
 - Codex 实际产出：新增 `apps/server/src/repository/scenario-repository.test.ts`；重构 `acceptance.test.ts` 的服务启动/停止辅助逻辑，使 AC-05 在保存后关闭服务，再以新的仓储实例启动服务并验证列表和详情。
 - 检查方法：运行 `npm.cmd test`；读取重启后的列表和详情，断言方案 ID 不变、操作数量为 2、现金 `25000.00`、A01/A02 为 `300/500` 股、科技行业 `55.00%` 超限、总资产守恒；清理阶段将临时 `scenarios.json` 写回 `[]`，并检查默认文件。
 - 实际核验结果：服务端 8 个测试文件 29 个测试、前端 1 个测试全部通过；新仓储实例和重启后的 HTTP 服务均成功读取方案，默认 `apps/server/data/scenarios.json` 仍为空数组。
+
+### 补充：前端交互验收与截图
+
+- 提供的上下文与完成标准：要求增强前端交互测试或浏览器验证脚本，覆盖初始集中度提醒、买卖操作、模拟结果、错误后保留成功结果、保存和重开，并更新四类关键截图。
+- Codex 实际产出：新增 `scripts/verify-browser.mjs`，使用 Chrome DevTools Protocol 执行并断言四条流程；重新生成 `overview.png`、`simulation-comparison.png`、`error-feedback.png` 和 `scenario-reopened.png`。
+- 检查方法：启动前后端开发服务和 Chrome 155 Headless，运行 `node scripts/verify-browser.mjs`；核对初始“2 项超限”、AC-03 行业对比、第二笔超卖错误和 `role="alert"`、旧结果保留、保存及重开。
+- 实际核验结果：脚本成功输出四阶段页面状态，错误阶段显示“持仓不足（第 2 笔操作失败）”、对比区仍存在且保存禁用；重开阶段显示 2 笔操作和总资产守恒；脚本 `finally` 将 `apps/server/data/scenarios.json` 恢复为 `[]`。随后使用图像查看核对四张截图内容和布局。

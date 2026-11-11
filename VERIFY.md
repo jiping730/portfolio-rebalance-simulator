@@ -11,7 +11,7 @@
 npm.cmd test
 ```
 
-实际结果：通过。服务端 7 个测试文件、28 个测试通过；前端 1 个测试文件、1 个测试通过，共 29/29 通过。
+实际结果：通过。服务端 8 个测试文件、29 个测试通过；前端 1 个测试文件、1 个测试通过，共 30/30 通过。
 
 ```text
 npm.cmd run build
@@ -51,7 +51,22 @@ npm.cmd run build
 
 浏览器验证使用本地 Chrome DevTools Protocol 执行页面操作，未访问外部网站。验证后将演示产生的临时方案恢复为 `apps/server/data/scenarios.json` 中的 `[]`，保持仓库初始状态。
 
-### 3.1 调仓校验错误反馈
+### 3.1 可重复浏览器交互脚本
+
+在前后端开发服务已启动、Chrome 以 `9222` 端口远程调试时执行：
+
+```text
+node scripts/verify-browser.mjs
+```
+
+脚本通过 Chrome DevTools Protocol 实际执行并断言：初始页面的 2 项集中度提醒；卖出 A01 100 股、买入 A02 100 股、提交模拟和行业集中度对比；第一次模拟成功后第二笔超卖失败时错误中文提示、`第 2 笔操作失败`、`role="alert"`、旧结果保留、过期提示和保存禁用；成功保存方案后重新打开并核对两笔操作和总资产守恒。脚本生成以下四张截图，并在 `finally` 中将默认 `apps/server/data/scenarios.json` 恢复为 `[]`：
+
+- `docs/screenshots/overview.png`
+- `docs/screenshots/simulation-comparison.png`
+- `docs/screenshots/error-feedback.png`
+- `docs/screenshots/scenario-reopened.png`
+
+### 3.2 调仓校验错误反馈
 
 使用同一 Chrome 155 Headless 页面重新加载后，逐条实际执行以下场景：
 
@@ -67,6 +82,7 @@ npm.cmd run build
 
 - [初始组合概览](docs/screenshots/overview.png)：总资产、现金、集中度提醒和持仓明细。
 - [调仓结果对比](docs/screenshots/simulation-comparison.png)：两笔操作、行业集中度变化、模拟结果、持仓变化及守恒提示。
+- [错误反馈](docs/screenshots/error-feedback.png)：第二笔超卖失败、中文提示、失败序号、旧结果和过期状态。
 - [方案重新打开](docs/screenshots/scenario-reopened.png)：重开提示、方案列表和相同的模拟结果。
 
 ## 5. 文档一致性检查

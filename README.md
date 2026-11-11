@@ -39,6 +39,9 @@ npm test
 
 # TypeScript 检查及前端生产构建
 npm run build
+
+# 需要本地 Chrome 以 9222 端口远程调试，并已启动前后端服务
+node scripts/verify-browser.mjs
 ```
 
 本项目不包含真实交易服务或生产服务器启动脚本；`build` 用于验证可编译和生成前端 `dist` 产物，开发环境按上面的两个命令启动即可。
@@ -61,6 +64,7 @@ apps/server/src/domain                金额、快照、计算和模拟领域逻
 apps/server/src/api                   Express API 与统一错误处理
 apps/server/src/repository            JSON 方案仓储
 apps/web/src                          React 页面和 API 客户端
+scripts/verify-browser.mjs            Chrome/CDP 交互验收与截图脚本
 docs/screenshots                      关键页面验证截图
 ```
 
@@ -73,6 +77,7 @@ docs/screenshots                      关键页面验证截图
 - [初始开工方案](PLAN.md)：开发前保留的范围、技术选择和验证计划。
 - [概览截图](docs/screenshots/overview.png)
 - [调仓结果截图](docs/screenshots/simulation-comparison.png)
+- [错误反馈截图](docs/screenshots/error-feedback.png)
 - [方案重开截图](docs/screenshots/scenario-reopened.png)
 
 ## 已知限制
