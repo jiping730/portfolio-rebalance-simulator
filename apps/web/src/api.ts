@@ -26,7 +26,20 @@ export interface IndustryAnalysis {
   thresholdPercent: string;
 }
 
-export interface PortfolioOverview {
+export interface PortfolioSummary {
+  totalAsset: string;
+  cash: string;
+  holdingCount: number;
+  alerts: ConcentrationAlert[];
+}
+
+export interface PortfolioAnalysis {
+  summary: PortfolioSummary;
+  instruments: InstrumentAnalysis[];
+  industries: IndustryAnalysis[];
+}
+
+export interface PortfolioOverview extends PortfolioAnalysis {
   portfolio: {
     portfolioId: string;
     snapshotId: string;
@@ -35,34 +48,107 @@ export interface PortfolioOverview {
     snapshotAt: string;
     cash: string;
   };
-  summary: {
-    totalAsset: string;
-    cash: string;
-    holdingCount: number;
-    alerts: ConcentrationAlert[];
-  };
-  instruments: InstrumentAnalysis[];
-  industries: IndustryAnalysis[];
+}
+
+export type TradeSide = 'buy' | 'sell';
+
+export interface TradeOperationInput {
+  side: TradeSide;
+  symbol: string;
+  quantity: number;
+}
+
+export interface TradeOperation extends TradeOperationInput {
+  order: number;
+}
+
+export interface SimulationInvariant {
+  originalTotalAsset: string;
+  simulatedTotalAsset: string;
+  isPreserved: boolean;
+}
+
+export interface SimulationResult {
+  operations: TradeOperation[];
+  original: PortfolioAnalysis;
+  simulated: PortfolioAnalysis;
+  invariant: SimulationInvariant;
+}
+
+export interface ScenarioListItem {
+  scenarioId: string;
+  name: string;
+  portfolioId: string;
+  snapshotId: string;
+  operationCount: number;
+  createdAt: string;
+}
+
+export interface ScenarioDetail {
+  scenarioId: string;
+  name: string;
+  portfolioId: string;
+  snapshotId: string;
+  operations: TradeOperation[];
+  createdAt: string;
+  result: PortfolioAnalysis & { invariant: SimulationInvariant };
 }
 
 export class PortfolioApiError extends Error {
-  constructor(message: string) {
+  constructor(
+    message: string,
+    public readonly code?: string,
+    public readonly details?: Record<string, unknown>,
+  ) {
     super(message);
     this.name = 'PortfolioApiError';
   }
 }
 
-export async function fetchPortfolio(signal?: AbortSignal): Promise<PortfolioOverview> {
-  const response = await fetch('/api/portfolio', { signal });
-  const payload = (await response.json().catch(() => null)) as
-    | { error?: { message?: string } }
-    | PortfolioOverview
-    | null;
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+async function requestJson<T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> {
+  const response = await fetch(input, init);
+  const payload = (await response.json().catch(() => null)) as unknown;
 
   if (!response.ok) {
-    const message = payload && 'error' in payload && payload.error?.message;
-    throw new PortfolioApiError(message || '组合数据加载失败，请稍后重试');
+    const error = isRecord(payload) && isRecord(payload.error) ? payload.error : undefined;
+    const message = error && typeof error.message === 'string' ? error.message : '请求失败，请稍后重试';
+    const code = error && typeof error.code === 'string' ? error.code : undefined;
+    const details = error && isRecord(error.details) ? error.details : undefined;
+    throw new PortfolioApiError(message, code, details);
   }
 
-  return payload as PortfolioOverview;
+  return payload as T;
+}
+
+export function fetchPortfolio(signal?: AbortSignal): Promise<PortfolioOverview> {
+  return requestJson<PortfolioOverview>('/api/portfolio', { signal });
+}
+
+export function previewSimulation(operations: TradeOperationInput[]): Promise<SimulationResult> {
+  return requestJson<SimulationResult>('/api/simulations/preview', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ operations }),
+  });
+}
+
+export function saveScenario(name: string, operations: TradeOperationInput[]): Promise<ScenarioDetail> {
+  return requestJson<ScenarioDetail>('/api/scenarios', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ name, operations }),
+  });
+}
+
+export async function fetchScenarios(): Promise<ScenarioListItem[]> {
+  const payload = await requestJson<{ data: ScenarioListItem[] }>('/api/scenarios');
+  return payload.data;
+}
+
+export function fetchScenario(scenarioId: string): Promise<ScenarioDetail> {
+  return requestJson<ScenarioDetail>(`/api/scenarios/${encodeURIComponent(scenarioId)}`);
 }
