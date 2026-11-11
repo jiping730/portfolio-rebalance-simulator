@@ -1,0 +1,14 @@
+{
+  "name": "portfolio-rebalance-simulator",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Fixed-snapshot portfolio analysis and rebalance simulation full-stack prototype",
+  "workspaces": [
+    "apps/server",
+    "apps/web"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "test": "npm run test --workspaces"
+  }
+}
