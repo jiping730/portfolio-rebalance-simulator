@@ -7,6 +7,7 @@ import {
   saveScenario,
   type IndustryAnalysis,
   type InstrumentAnalysis,
+  type PortfolioAnalysis,
   type PortfolioOverview,
   type ScenarioListItem,
   type SimulationResult,
@@ -118,6 +119,48 @@ function formatSigned(value: number): string {
   return value > 0 ? `+${value}` : String(value);
 }
 
+function formatPercentChange(original: string, simulated: string): string {
+  const change = Number(simulated) - Number(original);
+  return `${change > 0 ? '+' : ''}${change.toFixed(2)}%`;
+}
+
+function ConcentrationComparison({ original, simulated }: { original: PortfolioAnalysis; simulated: PortfolioAnalysis }) {
+  const originalByIndustry = useMemo(() => new Map(original.industries.map((item) => [item.industry, item])), [original]);
+
+  return (
+    <section className="concentration-comparison" aria-labelledby="simulation-concentration-title">
+      <div className="comparison-section-heading">
+        <div><p className="eyebrow">CONCENTRATION DELTA</p><h3 id="simulation-concentration-title">行业集中度对比</h3></div>
+        <span className="panel-meta">模拟结果</span>
+      </div>
+      <div className="table-wrap">
+        <table className="concentration-table">
+          <thead><tr><th>行业</th><th>原始市值</th><th>原始占比</th><th>模拟市值</th><th>模拟占比</th><th>占比变化</th><th>阈值</th><th>模拟状态</th></tr></thead>
+          <tbody>
+            {simulated.industries.map((industry) => {
+              const originalIndustry = originalByIndustry.get(industry.industry);
+              const originalRatio = originalIndustry?.ratioPercent ?? '0.00';
+              const change = Number(industry.ratioPercent) - Number(originalRatio);
+              return (
+                <tr key={industry.industry}>
+                  <td className="primary-cell">{industry.industry}</td>
+                  <td><Money value={originalIndustry?.marketValue ?? '0.00'} /></td>
+                  <td>{originalRatio}%</td>
+                  <td><Money value={industry.marketValue} /></td>
+                  <td>{industry.ratioPercent}%</td>
+                  <td className={change === 0 ? '' : change > 0 ? 'delta-positive' : 'delta-negative'}>{formatPercentChange(originalRatio, industry.ratioPercent)}</td>
+                  <td>{industry.thresholdPercent}%</td>
+                  <td><AlertBadge active={industry.isOverThreshold} /></td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
 function SimulationComparison({ result }: { result: SimulationResult }) {
   const originalBySymbol = useMemo(() => new Map(result.original.instruments.map((item) => [item.symbol, item])), [result.original]);
 
@@ -137,6 +180,7 @@ function SimulationComparison({ result }: { result: SimulationResult }) {
         </div>
       </div>
       <div className="invariant-note"><span aria-hidden="true">✓</span> 总资产守恒：{result.invariant.originalTotalAsset} → {result.invariant.simulatedTotalAsset}</div>
+      <ConcentrationComparison original={result.original} simulated={result.simulated} />
       <div className="table-wrap comparison-table-wrap">
         <table>
           <thead><tr><th>标的</th><th>原始持仓</th><th>模拟持仓</th><th>变化</th><th>模拟市值</th></tr></thead>
@@ -186,8 +230,16 @@ function RebalanceWorkspace({ portfolio }: { portfolio: PortfolioOverview }) {
       return;
     }
     setOperations((current) => [...current, { side, symbol, quantity: parsedQuantity }]);
+    setSimulation(null);
     setQuantity('');
     setFormError(null);
+    setSimulationError(null);
+    setSaveMessage(null);
+  };
+
+  const removeOperation = (operationIndex: number) => {
+    setOperations((current) => current.filter((_, index) => index !== operationIndex));
+    setSimulation(null);
     setSimulationError(null);
     setSaveMessage(null);
   };
@@ -267,7 +319,7 @@ function RebalanceWorkspace({ portfolio }: { portfolio: PortfolioOverview }) {
         <div className="operation-list-heading"><strong>待模拟操作</strong><span>{operations.length} 笔</span></div>
         {operations.length > 0 ? operations.map((operation, index) => {
           const instrument = portfolio.instruments.find((item) => item.symbol === operation.symbol);
-          return <div className="operation-row" key={`${operation.symbol}-${index}`}><span className="operation-order">{index + 1}</span><span className={operation.side === 'buy' ? 'side-buy' : 'side-sell'}>{operation.side === 'buy' ? '买入' : '卖出'}</span><strong>{instrument?.name ?? operation.symbol}</strong><span>{operation.quantity} 股</span><button type="button" className="icon-button" onClick={() => setOperations((current) => current.filter((_, itemIndex) => itemIndex !== index))} aria-label={`删除第 ${index + 1} 笔操作`}>×</button></div>;
+          return <div className="operation-row" key={`${operation.symbol}-${index}`}><span className="operation-order">{index + 1}</span><span className={operation.side === 'buy' ? 'side-buy' : 'side-sell'}>{operation.side === 'buy' ? '买入' : '卖出'}</span><strong>{instrument?.name ?? operation.symbol}</strong><span>{operation.quantity} 股</span><button type="button" className="icon-button" onClick={() => removeOperation(index)} aria-label={`删除第 ${index + 1} 笔操作`}>×</button></div>;
         }) : <p className="empty-copy">添加操作后，模拟结果会显示在这里。</p>}
       </div>
 

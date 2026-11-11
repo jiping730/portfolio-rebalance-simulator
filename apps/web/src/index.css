@@ -638,6 +638,36 @@ tbody tr:last-child td {
   font-size: 0.7rem;
 }
 
+.concentration-comparison {
+  margin: 18px 0;
+  padding: 16px;
+  background: #fbfcff;
+  border: 1px solid #e3ebf8;
+  border-radius: 12px;
+}
+
+.comparison-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.comparison-section-heading h3 {
+  margin: 0;
+  color: #26364f;
+  font-size: 0.98rem;
+}
+
+.comparison-section-heading .eyebrow {
+  margin-bottom: 4px;
+}
+
+.concentration-table {
+  min-width: 980px;
+}
+
 .comparison-table-wrap table {
   min-width: 600px;
 }
