@@ -1,5 +1,5 @@
 import { createServer, type Server } from 'node:http';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -7,9 +7,10 @@ import { createApp } from './api/app.js';
 import { loadPortfolioSnapshot } from './domain/snapshot.js';
 import { ScenarioRepository } from './repository/scenario-repository.js';
 
-let server: Server;
+let server: Server | undefined;
 let baseUrl: string;
 let scenarioDirectory: string;
+let scenarioFile: string;
 
 async function request(path: string, init?: RequestInit): Promise<{ status: number; body: any }> {
   const response = await fetch(`${baseUrl}${path}`, init);
@@ -24,22 +25,36 @@ function postJson(path: string, body: unknown) {
   });
 }
 
-beforeAll(async () => {
-  scenarioDirectory = await mkdtemp(join(tmpdir(), 'portfolio-acceptance-'));
-  server = createServer(createApp({
+async function startServer(): Promise<void> {
+  const nextServer = createServer(createApp({
     snapshot: loadPortfolioSnapshot(),
-    repository: new ScenarioRepository(join(scenarioDirectory, 'scenarios.json')),
+    repository: new ScenarioRepository(scenarioFile),
   }));
-  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
-  const address = server.address();
+  server = nextServer;
+  await new Promise<void>((resolve) => nextServer.listen(0, '127.0.0.1', resolve));
+  const address = nextServer.address();
   if (!address || typeof address === 'string') {
     throw new Error('acceptance server did not bind to a TCP port');
   }
   baseUrl = `http://127.0.0.1:${address.port}`;
+}
+
+async function stopServer(): Promise<void> {
+  if (!server) return;
+  const runningServer = server;
+  server = undefined;
+  await new Promise<void>((resolve, reject) => runningServer.close((error) => (error ? reject(error) : resolve())));
+}
+
+beforeAll(async () => {
+  scenarioDirectory = await mkdtemp(join(tmpdir(), 'portfolio-acceptance-'));
+  scenarioFile = join(scenarioDirectory, 'scenarios.json');
+  await startServer();
 });
 
 afterAll(async () => {
-  await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  await stopServer();
+  await writeFile(scenarioFile, '[]\n', 'utf8');
   await rm(scenarioDirectory, { recursive: true, force: true });
 });
 
@@ -93,7 +108,7 @@ describe('acceptance cases AC-01 to AC-05', () => {
     }
   });
 
-  it('AC-05: persists AC-03, reopens it and keeps the original portfolio unchanged', async () => {
+  it('AC-05: recovers AC-03 after a service restart and keeps the original portfolio unchanged', async () => {
     const operations = [
       { side: 'sell', symbol: 'A01', quantity: 100 },
       { side: 'buy', symbol: 'A02', quantity: 100 },
@@ -101,10 +116,45 @@ describe('acceptance cases AC-01 to AC-05', () => {
     const saved = await postJson('/api/scenarios', { name: 'AC-03 验收方案', operations });
     expect(saved.status).toBe(201);
 
+    await stopServer();
+    await startServer();
+
+    const listed = await request('/api/scenarios');
+    expect(listed.status).toBe(200);
+    expect(listed.body.data).toHaveLength(1);
+    expect(listed.body.data[0]).toMatchObject({
+      scenarioId: saved.body.scenarioId,
+      operationCount: 2,
+    });
+
     const reopened = await request(`/api/scenarios/${saved.body.scenarioId}`);
     expect(reopened.status).toBe(200);
+    expect(reopened.body.scenarioId).toBe(saved.body.scenarioId);
+    expect(reopened.body.operations).toHaveLength(2);
     expect(reopened.body.result.summary).toMatchObject({ totalAsset: '100000.00', cash: '25000.00' });
-    expect(reopened.body.result.invariant.isPreserved).toBe(true);
+    expect(reopened.body.result.invariant).toEqual({
+      originalTotalAsset: '100000.00',
+      simulatedTotalAsset: '100000.00',
+      isPreserved: true,
+    });
+    expect(reopened.body.result.instruments.find((item: { symbol: string }) => item.symbol === 'A01')).toMatchObject({
+      quantity: 300,
+      marketValue: '30000.00',
+      ratioPercent: '30.00',
+      isOverThreshold: false,
+    });
+    expect(reopened.body.result.instruments.find((item: { symbol: string }) => item.symbol === 'A02')).toMatchObject({
+      quantity: 500,
+      marketValue: '25000.00',
+      ratioPercent: '25.00',
+      isOverThreshold: false,
+    });
+    expect(reopened.body.result.industries.find((item: { industry: string }) => item.industry === '科技')).toMatchObject({
+      marketValue: '55000.00',
+      ratioPercent: '55.00',
+      thresholdPercent: '50.00',
+      isOverThreshold: true,
+    });
 
     const original = await request('/api/portfolio');
     expect(original.body.summary.cash).toBe('20000.00');
