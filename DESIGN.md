@@ -111,9 +111,9 @@ SavedScenario
 - createdAt: ISO datetime string
 ```
 
-原始组合是只读基准。每次模拟都深复制状态，后端不修改初始快照。保存只记录 `snapshotId`、方案名、操作列表、创建时间和服务端生成的 `scenarioId`，不保存最终现金、持仓、集中度等派生结果。重新打开时按 `snapshotId` 读取基准快照，重新执行操作并计算，保证结果可追溯且原始组合不被污染。
+原始组合是只读基准。每次模拟都深复制状态，后端不修改初始快照。保存实际记录 `portfolioId`、`snapshotId`、方案名、带 `order` 的规范化操作列表、创建时间和服务端生成的 `scenarioId`，不保存最终现金、持仓、集中度等派生结果。重新打开时校验保存的组合/快照标识与当前固定快照一致，再基于当前加载的快照重新执行操作并计算，保证结果可追溯且原始组合不被污染。
 
-持久化使用 `data/scenarios.json`。选择本地 JSON 是因为本任务单用户、单组合、低并发，零数据库配置即可满足重启恢复。写入采用临时文件替换或串行写入，避免产生半写文件。若扩展到多用户或并发场景，再迁移 SQLite/PostgreSQL，并增加事务和唯一约束。
+持久化使用 `data/scenarios.json`。选择本地 JSON 是因为本任务单用户、单组合、低并发，零数据库配置即可满足重启恢复。当前实现通过仓储实例内的串行队列直接写入文件；不提供临时文件替换、跨进程锁或崩溃恢复保证，适用范围仅为单机单实例演示。若扩展到多用户或并发场景，再迁移 SQLite/PostgreSQL，并增加事务和唯一约束。
 
 ## 4. 系统结构
 
@@ -157,9 +157,9 @@ Express API
 
 - `400 Bad Request`：请求体不是合法 JSON，或 JSON 结构不符合接口契约；字段缺失、类型错误、业务校验失败、空方案名、空操作列表均属于此类。
 - `404 Not Found`：方案或指定资源不存在。
-- `500 Internal Server Error`：服务端未预期异常；不向客户端暴露堆栈。
+- `500 Internal Server Error`：存储错误或服务端未预期异常；不向客户端暴露堆栈。
 
-建议错误码：`INVALID_JSON`、`VALIDATION_ERROR`、`EMPTY_SCENARIO_NAME`、`EMPTY_OPERATIONS`、`INVALID_QUANTITY`、`INVALID_SIDE`、`UNKNOWN_SYMBOL`、`INSUFFICIENT_CASH`、`INSUFFICIENT_HOLDING`、`INVALID_SNAPSHOT`、`SCENARIO_NOT_FOUND`、`STORAGE_ERROR`。
+实际错误码包括：`INVALID_JSON`、`VALIDATION_ERROR`、`EMPTY_SCENARIO_NAME`、`EMPTY_OPERATIONS`、`INVALID_OPERATION`、`INVALID_QUANTITY`、`INVALID_SIDE`、`UNKNOWN_SYMBOL`、`INSUFFICIENT_CASH`、`INSUFFICIENT_HOLDING`、`AMOUNT_OVERFLOW`、`TOTAL_ASSET_NOT_PRESERVED`、`INVALID_SNAPSHOT`、`SCENARIO_NOT_FOUND`、`STORAGE_ERROR`、`INTERNAL_ERROR`。调仓错误的 `details.operationIndex` 为 0-based；前端将其转换为用户可读的“第 N 笔操作失败”。
 
 本任务不要求重复保存去重；相同名称允许保存多个方案，因为每个方案都有不同的服务端 `scenarioId`。方案名只要求非空，去除首尾空白后长度为 1–80 个字符。
 
@@ -265,15 +265,24 @@ Content-Type: application/json
 
 ```json
 {
-  "scenarioId": "SCN-20261111-001",
+  "scenarioId": "SCN-550e8400-e29b-41d4-a716-446655440000",
   "name": "降低科技集中度",
   "portfolioId": "DEMO-001",
   "snapshotId": "SNAP-20261102",
   "operations": [
     { "order": 1, "side": "sell", "symbol": "A01", "quantity": 100 }
   ],
-  "createdAt": "2026-11-11T11:35:00+08:00",
-  "result": { "summary": {}, "instruments": [], "industries": [] }
+  "createdAt": "2026-11-11T03:35:00.000Z",
+  "result": {
+    "summary": {},
+    "instruments": [],
+    "industries": [],
+    "invariant": {
+      "originalTotalAsset": "100000.00",
+      "simulatedTotalAsset": "100000.00",
+      "isPreserved": true
+    }
+  }
 }
 ```
 
@@ -292,31 +301,31 @@ GET /api/scenarios/:scenarioId
 {
   "data": [
     {
-      "scenarioId": "SCN-20261111-001",
+      "scenarioId": "SCN-550e8400-e29b-41d4-a716-446655440000",
       "name": "降低科技集中度",
       "portfolioId": "DEMO-001",
       "snapshotId": "SNAP-20261102",
       "operationCount": 1,
-      "createdAt": "2026-11-11T11:35:00+08:00"
+      "createdAt": "2026-11-11T03:35:00.000Z"
     }
   ]
 }
 ```
 
-无保存方案时返回 `{"data": []}`。重开：`200 OK`，返回保存元数据、操作列表和重新计算的 `result`。不存在的 `scenarioId` 返回 `404`。
+无保存方案时返回 `{"data": []}`。重开：`200 OK`，返回保存元数据、规范化操作列表和重新计算的 `result`。不存在的 `scenarioId` 返回 `404`；方案保存的 `portfolioId` 或 `snapshotId` 与当前固定快照不一致时返回 `500 INVALID_SNAPSHOT`。
 
 重新打开方案的成功响应：
 
 ```json
 {
-  "scenarioId": "SCN-20261111-001",
+  "scenarioId": "SCN-550e8400-e29b-41d4-a716-446655440000",
   "name": "降低科技集中度",
   "portfolioId": "DEMO-001",
   "snapshotId": "SNAP-20261102",
   "operations": [
     { "order": 1, "side": "sell", "symbol": "A01", "quantity": 100 }
   ],
-  "createdAt": "2026-11-11T11:35:00+08:00",
+  "createdAt": "2026-11-11T03:35:00.000Z",
   "result": {
     "summary": {},
     "instruments": [],
@@ -330,14 +339,14 @@ GET /api/scenarios/:scenarioId
 }
 ```
 
-`result` 与调仓预览中的 `simulated` 使用相同的分析结构；示例中的空对象和数组仅用于表示字段形状，实际响应包含完整数据。
+`result` 与调仓预览中的 `simulated` 使用相同的分析结构，并额外包含 `invariant`；示例中的空对象和数组仅用于表示字段形状，实际响应包含完整数据。
 
 ## 6. 前端交互
 
 - 概览区显示组合名、快照时间、总资产、现金、持仓表、行业表。
 - 提醒显示对象、实际比例和适用阈值，例如“科技行业 60.00%，阈值 50.00%”。
 - 调仓区选择方向、标的、数量后加入操作列表；模拟成功才刷新对比区。
-- 调仓失败时保留上一次成功结果，显示错误码对应的中文说明和失败操作序号。
+- 调仓失败时保留上一次成功结果；操作列表变化后将旧结果标记为过期并禁用保存。错误提示显示后端错误码对应的中文标签、后端消息和失败操作序号，例如“现金不足……（第 1 笔操作失败）”，调仓错误节点使用 `role="alert"`。
 - 保存成功后刷新方案列表；重开使用接口返回结果，不依赖浏览器本地状态。
 - 加载中显示状态，加载失败显示重试；方案为空显示引导文案。
 
@@ -349,7 +358,7 @@ GET /api/scenarios/:scenarioId
 
 ### 决策二：保存操作而非派生结果
 
-不保存最终现金、持仓、集中度等派生结果，只保存 `snapshotId`、操作列表、名称和创建时间。重开时重新计算，结果可追溯，避免基准快照和派生数据不一致。
+不保存最终现金、持仓、集中度等派生结果，只保存 `portfolioId`、`snapshotId`、规范化操作列表、名称、服务端生成的 `scenarioId` 和创建时间。重开时校验快照标识并重新计算，结果可追溯，避免基准快照和派生数据不一致。
 
 ### 决策三：整批原子性
 
@@ -373,7 +382,7 @@ GET /api/scenarios/:scenarioId
 
 AI 生成代码必须经过单元测试、手工复算 AC-01～AC-03、实际浏览器操作三重核验。重点检查是否误用四舍五入比较、是否修改原始组合、是否部分提交失败交易、是否把派生结果写入持久化文件。
 
-## 9. AI 协作记录（截至步骤 18）
+## 9. AI 协作记录（摘要；完整记录见 `.codex`）
 
 工具：Codex（Codex Desktop，GPT-5）。以下记录保留当前实现阶段的关键上下文和摘要，不替代完整对话记录。
 
@@ -437,11 +446,11 @@ AI 生成代码必须经过单元测试、手工复算 AC-01～AC-03、实际浏
 - 检查方法：运行前后端生产构建和全量测试，确认服务端 23 个测试、前端 1 个测试全部通过，并核对模拟结果使用 `original`/`simulated` 结构、重开结果使用扁平化 `result` 结构。
 - 采用依据：模拟失败时不覆盖上一次成功结果，重开方案时使用后端重新计算结果；本轮先完成编译和自动化验证，随后在步骤 15～18 通过本地浏览器完成端到端操作和截图验收，详见 9.10 与 VERIFY.md。
 
-### 9.10 验收测试、浏览器验证与交付文档（步骤 15～18）
+### 9.10 验收测试、浏览器验证与交付文档（步骤 15～18 历史记录）
 
 - 提供的上下文与完成标准：依据 PLAN.md、DESIGN.md 和 AC-01～AC-05，补充自动化验收测试，实际检查概览、调仓、保存和重开流程，生成关键页面截图，并完成 README、VERIFY 和本文档的事实记录；提交信息要求为 `test: verify acceptance cases and complete delivery docs`。
 - AI 实际产出：新增 `apps/server/src/acceptance.test.ts`，覆盖 AC-01～AC-05；新增 `README.md`、`VERIFY.md` 和 `docs/screenshots/overview.png`、`simulation-comparison.png`、`scenario-reopened.png`；补充本节、完成情况和检查清单；同时将本轮关键交互摘要写入 `.codex`。
-- 检查方法：执行 `npm.cmd test`，服务端 7 个测试文件 28 个测试、前端 1 个测试全部通过，共 29/29；执行 `npm.cmd run build`，服务端 TypeScript 编译和前端 Vite 构建均通过。启动本地前后端后用 Chrome 155 Headless 访问 `http://127.0.0.1:5173`，实际执行卖出 A01 100 股、买入 A02 100 股、提交、保存和重新打开，核对 DOM 文本与截图。
+- 检查方法：步骤 15～18 当时执行 `npm.cmd test`，服务端 7 个测试文件 28 个测试、前端 1 个测试全部通过，共 29/29；执行 `npm.cmd run build`，服务端 TypeScript 编译和前端 Vite 构建均通过。启动本地前后端后用 Chrome 155 Headless 访问 `http://127.0.0.1:5173`，实际执行卖出 A01 100 股、买入 A02 100 股、提交、保存和重新打开，核对 DOM 文本与截图。后续测试数量和交互覆盖以 9.13、9.14 及 VERIFY.md 的当前记录为准。
 - 实际核验结果：初始页面显示总资产 `100000.00`、现金 `20000.00` 和 2 项告警；模拟后现金为 `25000.00`、科技行业为 `55.00%`、总资产守恒；保存后列表有 1 个方案，重开后仍有 2 笔操作且守恒提示保持不变。浏览器验证结束后恢复了默认 `apps/server/data/scenarios.json` 的空数组。
 - 采用依据与修改：保留后端唯一计算口径和本地 JSON 仓储；将自动化验收作为 AC 证据，将截图和命令输出作为交付证据；未把浏览器临时方案或未实现的 CI、部署、编辑删除功能写成已完成项。
 

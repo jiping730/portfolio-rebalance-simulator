@@ -65,3 +65,10 @@
 - Codex 实际产出：新增 `scripts/verify-browser.mjs`，使用 Chrome DevTools Protocol 执行并断言四条流程；重新生成 `overview.png`、`simulation-comparison.png`、`error-feedback.png` 和 `scenario-reopened.png`。
 - 检查方法：启动前后端开发服务和 Chrome 155 Headless，运行 `node scripts/verify-browser.mjs`；核对初始“2 项超限”、AC-03 行业对比、第二笔超卖错误和 `role="alert"`、旧结果保留、保存及重开。
 - 实际核验结果：脚本成功输出四阶段页面状态，错误阶段显示“持仓不足（第 2 笔操作失败）”、对比区仍存在且保存禁用；重开阶段显示 2 笔操作和总资产守恒；脚本 `finally` 将 `apps/server/data/scenarios.json` 恢复为 `[]`。随后使用图像查看核对四张截图内容和布局。
+
+### 补充：文档、代码、测试和截图一致性复核
+
+- 提供的上下文与完成标准：对齐 `DESIGN.md` 与实际持久化字段、错误展示和实现行为，补充 `VERIFY.md` 的服务重启实际结果，更新 README 核心流程，并完成文档、代码、测试和截图一致性检查。
+- Codex 实际产出：修正设计中的 `SavedScenario` 字段为 `portfolioId`、`snapshotId`、规范化操作、`scenarioId`、`createdAt`；明确 `result` 不落盘、仓储为单进程串行直接写入；补充错误序号 0-based 到页面“第 N 笔”的转换、中文错误标签和过期结果行为；更新 README 六步核心流程和 VERIFY 重启结果。
+- 检查方法：逐项对照 `domain/types.ts`、`scenario-repository.ts`、`api/app.ts`、`App.tsx`、AC-05 重启测试、浏览器验收脚本和四张截图；运行 `npm.cmd test`、`npm.cmd run build`、`git diff --check`，并确认 `apps/server/data/scenarios.json` 为 `[]`。
+- 实际核验结果：文档中的持久化字段、API 响应形状、中文错误展示、`role="alert"`、失败后保留/过期逻辑、服务重启结果与实现一致；测试和构建通过，截图对应实际页面状态。未修改业务代码或测试，只修正文档记录。

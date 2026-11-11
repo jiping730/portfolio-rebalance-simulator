@@ -39,6 +39,8 @@ npm.cmd run build
 
 独立的 `scenario-repository.test.ts` 还验证了新 `ScenarioRepository` 实例的 `list`/`findById` 读取。两个测试的临时 `scenarios.json` 在清理阶段均写回 `[]` 后删除；默认 `apps/server/data/scenarios.json` 未被测试污染，测试结束后仍为空数组。
 
+实际执行结果：`npm.cmd test` 中 AC-05 在服务实例 A 保存后关闭服务，再以新的 `ScenarioRepository` 启动服务实例 B；列表和重开请求均返回 `200`，方案 ID 保持一致，详情中的两笔规范化操作和全部计算字段符合上表。测试结束后默认 `apps/server/data/scenarios.json` 实际检查为 `[]`。
+
 ## 3. 浏览器验证
 
 启动后端和前端开发服务后，在本机 Chrome 中访问 `http://127.0.0.1:5173`，执行以下步骤：
