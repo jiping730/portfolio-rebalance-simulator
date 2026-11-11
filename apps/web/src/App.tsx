@@ -5,6 +5,7 @@ import {
   fetchScenarios,
   previewSimulation,
   saveScenario,
+  PortfolioApiError,
   type IndustryAnalysis,
   type InstrumentAnalysis,
   type PortfolioAnalysis,
@@ -119,6 +120,31 @@ function formatSigned(value: number): string {
   return value > 0 ? `+${value}` : String(value);
 }
 
+const simulationErrorLabels: Record<string, string> = {
+  EMPTY_OPERATIONS: '操作列表为空',
+  INVALID_OPERATION: '交易操作无效',
+  INVALID_SIDE: '交易方向无效',
+  INVALID_QUANTITY: '交易数量无效',
+  UNKNOWN_SYMBOL: '交易标的不存在',
+  INSUFFICIENT_CASH: '现金不足',
+  INSUFFICIENT_HOLDING: '持仓不足',
+  AMOUNT_OVERFLOW: '交易金额超出范围',
+  TOTAL_ASSET_NOT_PRESERVED: '总资产校验失败',
+};
+
+function formatSimulationError(reason: unknown): string {
+  if (!(reason instanceof PortfolioApiError)) {
+    return reason instanceof Error ? reason.message : '模拟提交失败';
+  }
+
+  const label = reason.code ? simulationErrorLabels[reason.code] ?? '模拟校验失败' : '模拟校验失败';
+  const operationIndex = reason.details?.operationIndex;
+  const operationHint = typeof operationIndex === 'number' && Number.isInteger(operationIndex) && operationIndex >= 0
+    ? `（第 ${operationIndex + 1} 笔操作失败）`
+    : '';
+  return `${label}：${reason.message}${operationHint}`;
+}
+
 function formatPercentChange(original: string, simulated: string): string {
   const change = Number(simulated) - Number(original);
   return `${change > 0 ? '+' : ''}${change.toFixed(2)}%`;
@@ -161,7 +187,7 @@ function ConcentrationComparison({ original, simulated }: { original: PortfolioA
   );
 }
 
-function SimulationComparison({ result }: { result: SimulationResult }) {
+function SimulationComparison({ result, stale }: { result: SimulationResult; stale: boolean }) {
   const originalBySymbol = useMemo(() => new Map(result.original.instruments.map((item) => [item.symbol, item])), [result.original]);
 
   return (
@@ -180,6 +206,7 @@ function SimulationComparison({ result }: { result: SimulationResult }) {
         </div>
       </div>
       <div className="invariant-note"><span aria-hidden="true">✓</span> 总资产守恒：{result.invariant.originalTotalAsset} → {result.invariant.simulatedTotalAsset}</div>
+      {stale && <div className="stale-note" role="status">当前操作列表已变化，以上为上一次成功模拟结果，请重新提交后再保存。</div>}
       <ConcentrationComparison original={result.original} simulated={result.simulated} />
       <div className="table-wrap comparison-table-wrap">
         <table>
@@ -203,6 +230,7 @@ function RebalanceWorkspace({ portfolio }: { portfolio: PortfolioOverview }) {
   const [quantity, setQuantity] = useState('');
   const [operations, setOperations] = useState<TradeOperationInput[]>([]);
   const [simulation, setSimulation] = useState<SimulationResult | null>(null);
+  const [simulationStale, setSimulationStale] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [simulationError, setSimulationError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -230,7 +258,7 @@ function RebalanceWorkspace({ portfolio }: { portfolio: PortfolioOverview }) {
       return;
     }
     setOperations((current) => [...current, { side, symbol, quantity: parsedQuantity }]);
-    setSimulation(null);
+    if (simulation) setSimulationStale(true);
     setQuantity('');
     setFormError(null);
     setSimulationError(null);
@@ -239,7 +267,7 @@ function RebalanceWorkspace({ portfolio }: { portfolio: PortfolioOverview }) {
 
   const removeOperation = (operationIndex: number) => {
     setOperations((current) => current.filter((_, index) => index !== operationIndex));
-    setSimulation(null);
+    if (simulation) setSimulationStale(true);
     setSimulationError(null);
     setSaveMessage(null);
   };
@@ -253,14 +281,17 @@ function RebalanceWorkspace({ portfolio }: { portfolio: PortfolioOverview }) {
     setSimulationError(null);
     setSaveMessage(null);
     void previewSimulation(operations)
-      .then(setSimulation)
-      .catch((reason: unknown) => setSimulationError(reason instanceof Error ? reason.message : '模拟提交失败'))
+      .then((result) => {
+        setSimulation(result);
+        setSimulationStale(false);
+      })
+      .catch((reason: unknown) => setSimulationError(formatSimulationError(reason)))
       .finally(() => setSubmitting(false));
   };
 
   const saveCurrentScenario = () => {
     const name = saveName.trim();
-    if (!simulation) {
+    if (!simulation || simulationStale) {
       setSaveMessage('请先完成一次成功模拟');
       return;
     }
@@ -293,6 +324,7 @@ function RebalanceWorkspace({ portfolio }: { portfolio: PortfolioOverview }) {
           simulated,
           invariant,
         });
+        setSimulationStale(false);
         setSimulationError(null);
         setSaveMessage(`已重新打开方案“${scenario.name}”`);
       })
@@ -313,7 +345,7 @@ function RebalanceWorkspace({ portfolio }: { portfolio: PortfolioOverview }) {
         <label>数量<input type="number" min="1" step="1" value={quantity} onChange={(event) => setQuantity(event.target.value)} placeholder="正整数" /></label>
         <button type="button" className="button button--secondary" onClick={addOperation}>加入操作</button>
       </div>
-      {formError && <p className="inline-error">{formError}</p>}
+      {formError && <p className="inline-error" role="alert">{formError}</p>}
 
       <div className="operation-list">
         <div className="operation-list-heading"><strong>待模拟操作</strong><span>{operations.length} 笔</span></div>
@@ -323,20 +355,20 @@ function RebalanceWorkspace({ portfolio }: { portfolio: PortfolioOverview }) {
         }) : <p className="empty-copy">添加操作后，模拟结果会显示在这里。</p>}
       </div>
 
-      <div className="simulation-actions"><button type="button" className="button button--primary" onClick={submitSimulation} disabled={submitting}>{submitting ? '处理中…' : '提交模拟'}</button>{simulationError && <p className="inline-error">{simulationError}</p>}</div>
+      <div className="simulation-actions"><button type="button" className="button button--primary" onClick={submitSimulation} disabled={submitting}>{submitting ? '处理中…' : '提交模拟'}</button>{simulationError && <p className="inline-error" role="alert">{simulationError}</p>}</div>
 
-      {simulation && <SimulationComparison result={simulation} />}
+      {simulation && <SimulationComparison result={simulation} stale={simulationStale} />}
 
       <div className="scenario-save-row">
         <div><p className="eyebrow">SAVE SCENARIO</p><strong>保存当前方案</strong></div>
-        <input value={saveName} onChange={(event) => setSaveName(event.target.value)} placeholder="例如：降低科技集中度" disabled={!simulation || submitting} />
-        <button type="button" className="button button--secondary" onClick={saveCurrentScenario} disabled={!simulation || submitting}>保存方案</button>
+        <input value={saveName} onChange={(event) => setSaveName(event.target.value)} placeholder="例如：降低科技集中度" disabled={!simulation || simulationStale || submitting} />
+        <button type="button" className="button button--secondary" onClick={saveCurrentScenario} disabled={!simulation || simulationStale || submitting}>保存方案</button>
       </div>
       {saveMessage && <p className="inline-message">{saveMessage}</p>}
 
       <div className="scenario-list">
         <div className="operation-list-heading"><div><p className="eyebrow">SAVED SCENARIOS</p><strong>已保存方案</strong></div><span>{scenarios.length} 个</span></div>
-        {loadingScenarios ? <p className="empty-copy">正在加载方案列表…</p> : scenarioError ? <p className="inline-error">{scenarioError}</p> : scenarios.length === 0 ? <p className="empty-copy">暂无保存方案。</p> : scenarios.map((scenario) => <div className="scenario-row" key={scenario.scenarioId}><div><strong>{scenario.name}</strong><span>{scenario.operationCount} 笔操作 · {formatSnapshotTime(scenario.createdAt)}</span></div><button type="button" className="button button--ghost" onClick={() => reopenScenario(scenario.scenarioId)} disabled={openingScenario !== null}>{openingScenario === scenario.scenarioId ? '打开中…' : '重新打开'}</button></div>)}
+        {loadingScenarios ? <p className="empty-copy">正在加载方案列表…</p> : scenarioError ? <p className="inline-error" role="alert">{scenarioError}</p> : scenarios.length === 0 ? <p className="empty-copy">暂无保存方案。</p> : scenarios.map((scenario) => <div className="scenario-row" key={scenario.scenarioId}><div><strong>{scenario.name}</strong><span>{scenario.operationCount} 笔操作 · {formatSnapshotTime(scenario.createdAt)}</span></div><button type="button" className="button button--ghost" onClick={() => reopenScenario(scenario.scenarioId)} disabled={openingScenario !== null}>{openingScenario === scenario.scenarioId ? '打开中…' : '重新打开'}</button></div>)}
       </div>
     </section>
   );
