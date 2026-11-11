@@ -89,7 +89,7 @@ function ConcentrationAlerts({ alerts }: { alerts: PortfolioOverview['summary'][
       <div className="panel-heading">
         <div><p className="eyebrow">CONCENTRATION CHECK</p><h2 id="alert-title">集中度提醒</h2></div>
         <span className={alerts.length > 0 ? 'alert-count alert-count--danger' : 'alert-count alert-count--safe'}>
-          {alerts.length > 0 ? `${alerts.length} 项超限` : '全部正常'}
+          <span className="alert-count-dot" aria-hidden="true" />{alerts.length > 0 ? `${alerts.length} 项超限` : '全部正常'}
         </span>
       </div>
       {alerts.length > 0 ? (
@@ -97,7 +97,8 @@ function ConcentrationAlerts({ alerts }: { alerts: PortfolioOverview['summary'][
           {alerts.map((alert) => (
             <div className="alert-item" key={`${alert.type}-${alert.key}`}>
               <span className="alert-icon" aria-hidden="true">!</span>
-              <div><strong>{alert.label}</strong><p>{alert.type === 'instrument' ? '单一标的' : '行业'}占比 {alert.ratioPercent}%，超过阈值 {alert.thresholdPercent}%</p></div>
+              <div className="alert-item-copy"><strong>{alert.label}</strong><p>{alert.type === 'instrument' ? '单一标的' : '行业'}占比 <b>{alert.ratioPercent}%</b>，超过阈值 {alert.thresholdPercent}%</p></div>
+              <span className="alert-item-tag">需关注</span>
             </div>
           ))}
         </div>
@@ -334,41 +335,47 @@ function RebalanceWorkspace({ portfolio }: { portfolio: PortfolioOverview }) {
 
   return (
     <section className="panel simulation-panel" aria-labelledby="simulation-title">
-      <div className="panel-heading">
-        <div><p className="eyebrow">REBALANCE LAB</p><h2 id="simulation-title">调仓模拟</h2></div>
-        <span className="panel-meta">按顺序执行 · 固定价格</span>
+      <div className="panel-heading simulation-heading">
+        <div><p className="eyebrow">REBALANCE LAB</p><h2 id="simulation-title">调仓模拟</h2><p className="section-description">按固定快照价格，按顺序验证你的交易方案</p></div>
+        <span className="workflow-pill"><span className="workflow-step workflow-step--active">1</span>录入<span className="workflow-line" /><span className="workflow-step">2</span>模拟<span className="workflow-line" /><span className="workflow-step">3</span>保存</span>
       </div>
 
-      <div className="trade-form">
-        <label>方向<select value={side} onChange={(event) => setSide(event.target.value as TradeSide)}><option value="buy">买入</option><option value="sell">卖出</option></select></label>
-        <label>标的<select value={symbol} onChange={(event) => setSymbol(event.target.value)}>{portfolio.instruments.map((instrument) => <option key={instrument.symbol} value={instrument.symbol}>{instrument.symbol} · {instrument.name}</option>)}</select></label>
-        <label>数量<input type="number" min="1" step="1" value={quantity} onChange={(event) => setQuantity(event.target.value)} placeholder="正整数" /></label>
-        <button type="button" className="button button--secondary" onClick={addOperation}>加入操作</button>
-      </div>
-      {formError && <p className="inline-error" role="alert">{formError}</p>}
+      <div className="workspace-layout">
+        <div className="workspace-input">
+          <div className="subsection-heading"><div><p className="eyebrow">TRADE BUILDER</p><strong>添加交易操作</strong></div><span className="panel-meta">按顺序执行</span></div>
+          <div className="trade-form">
+            <label>方向<select value={side} onChange={(event) => setSide(event.target.value as TradeSide)}><option value="buy">买入</option><option value="sell">卖出</option></select></label>
+            <label>标的<select value={symbol} onChange={(event) => setSymbol(event.target.value)}>{portfolio.instruments.map((instrument) => <option key={instrument.symbol} value={instrument.symbol}>{instrument.symbol} · {instrument.name}</option>)}</select></label>
+            <label>数量<input type="number" min="1" step="1" value={quantity} onChange={(event) => setQuantity(event.target.value)} placeholder="正整数" /></label>
+            <button type="button" className="button button--secondary" onClick={addOperation}><span aria-hidden="true">＋</span> 加入操作</button>
+          </div>
+          {formError && <p className="inline-error" role="alert">{formError}</p>}
 
-      <div className="operation-list">
-        <div className="operation-list-heading"><strong>待模拟操作</strong><span>{operations.length} 笔</span></div>
-        {operations.length > 0 ? operations.map((operation, index) => {
-          const instrument = portfolio.instruments.find((item) => item.symbol === operation.symbol);
-          return <div className="operation-row" key={`${operation.symbol}-${index}`}><span className="operation-order">{index + 1}</span><span className={operation.side === 'buy' ? 'side-buy' : 'side-sell'}>{operation.side === 'buy' ? '买入' : '卖出'}</span><strong>{instrument?.name ?? operation.symbol}</strong><span>{operation.quantity} 股</span><button type="button" className="icon-button" onClick={() => removeOperation(index)} aria-label={`删除第 ${index + 1} 笔操作`}>×</button></div>;
-        }) : <p className="empty-copy">添加操作后，模拟结果会显示在这里。</p>}
-      </div>
+          <div className="operation-list">
+            <div className="operation-list-heading"><div><p className="eyebrow">ORDER QUEUE</p><strong>待模拟操作</strong></div><span className="queue-count">{operations.length} 笔</span></div>
+            {operations.length > 0 ? operations.map((operation, index) => {
+              const instrument = portfolio.instruments.find((item) => item.symbol === operation.symbol);
+              return <div className="operation-row" key={`${operation.symbol}-${index}`}><span className="operation-order">{index + 1}</span><span className={operation.side === 'buy' ? 'side-buy' : 'side-sell'}>{operation.side === 'buy' ? '买入' : '卖出'}</span><strong>{instrument?.name ?? operation.symbol}</strong><span className="operation-symbol">{operation.symbol}</span><span className="operation-quantity">{operation.quantity} 股</span><button type="button" className="icon-button" onClick={() => removeOperation(index)} aria-label={`删除第 ${index + 1} 笔操作`}>×</button></div>;
+            }) : <div className="empty-operation"><span aria-hidden="true">＋</span><p>添加操作后，模拟结果会显示在这里。</p></div>}
+          </div>
 
-      <div className="simulation-actions"><button type="button" className="button button--primary" onClick={submitSimulation} disabled={submitting}>{submitting ? '处理中…' : '提交模拟'}</button>{simulationError && <p className="inline-error" role="alert">{simulationError}</p>}</div>
+          <div className="simulation-actions"><button type="button" className="button button--primary" onClick={submitSimulation} disabled={submitting}>{submitting ? <><span className="button-spinner" aria-hidden="true" />处理中…</> : <><span aria-hidden="true">▶</span> 提交模拟</>}</button>{simulationError && <p className="inline-error" role="alert">{simulationError}</p>}</div>
+        </div>
+        <aside className="workspace-hint"><span className="hint-icon" aria-hidden="true">i</span><div><strong>模拟规则</strong><p>买入会减少现金，卖出会增加现金。任意一笔操作失败时，整批模拟不会生效。</p></div></aside>
+      </div>
 
       {simulation && <SimulationComparison result={simulation} stale={simulationStale} />}
 
       <div className="scenario-save-row">
-        <div><p className="eyebrow">SAVE SCENARIO</p><strong>保存当前方案</strong></div>
-        <input value={saveName} onChange={(event) => setSaveName(event.target.value)} placeholder="例如：降低科技集中度" disabled={!simulation || simulationStale || submitting} />
+        <div><p className="eyebrow">SAVE SCENARIO</p><strong>保存当前方案</strong><span className="save-helper">仅保存快照、操作列表和方案名称</span></div>
+        <input aria-label="方案名称" value={saveName} onChange={(event) => setSaveName(event.target.value)} placeholder="例如：降低科技集中度" disabled={!simulation || simulationStale || submitting} />
         <button type="button" className="button button--secondary" onClick={saveCurrentScenario} disabled={!simulation || simulationStale || submitting}>保存方案</button>
       </div>
-      {saveMessage && <p className="inline-message">{saveMessage}</p>}
+      {saveMessage && <p className="inline-message" role="status">{saveMessage}</p>}
 
       <div className="scenario-list">
-        <div className="operation-list-heading"><div><p className="eyebrow">SAVED SCENARIOS</p><strong>已保存方案</strong></div><span>{scenarios.length} 个</span></div>
-        {loadingScenarios ? <p className="empty-copy">正在加载方案列表…</p> : scenarioError ? <p className="inline-error" role="alert">{scenarioError}</p> : scenarios.length === 0 ? <p className="empty-copy">暂无保存方案。</p> : scenarios.map((scenario) => <div className="scenario-row" key={scenario.scenarioId}><div><strong>{scenario.name}</strong><span>{scenario.operationCount} 笔操作 · {formatSnapshotTime(scenario.createdAt)}</span></div><button type="button" className="button button--ghost" onClick={() => reopenScenario(scenario.scenarioId)} disabled={openingScenario !== null}>{openingScenario === scenario.scenarioId ? '打开中…' : '重新打开'}</button></div>)}
+        <div className="operation-list-heading"><div><p className="eyebrow">SAVED SCENARIOS</p><strong>已保存方案</strong></div><span className="queue-count">{scenarios.length} 个</span></div>
+        {loadingScenarios ? <div className="empty-operation"><span className="button-spinner button-spinner--dark" aria-hidden="true" /><p>正在加载方案列表…</p></div> : scenarioError ? <p className="inline-error" role="alert">{scenarioError}</p> : scenarios.length === 0 ? <div className="empty-operation"><span aria-hidden="true">▱</span><p>暂无保存方案，完成模拟后可以在这里留存方案。</p></div> : scenarios.map((scenario) => <div className="scenario-row" key={scenario.scenarioId}><div><strong>{scenario.name}</strong><span>{scenario.operationCount} 笔操作 · {formatSnapshotTime(scenario.createdAt)}</span></div><button type="button" className="button button--ghost" onClick={() => reopenScenario(scenario.scenarioId)} disabled={openingScenario !== null}>{openingScenario === scenario.scenarioId ? '打开中…' : '重新打开'}</button></div>)}
       </div>
     </section>
   );
@@ -377,13 +384,40 @@ function RebalanceWorkspace({ portfolio }: { portfolio: PortfolioOverview }) {
 function OverviewPage({ data, onRefresh }: { data: PortfolioOverview; onRefresh: () => void }) {
   return (
     <main className="page-shell">
-      <header className="topbar"><div className="brand-mark">PF</div><div><p className="eyebrow">PORTFOLIO LAB</p><h1>投资组合分析</h1></div><button type="button" className="button button--ghost" onClick={onRefresh}>刷新数据</button></header>
-      <section className="hero-card"><div><p className="eyebrow">{data.portfolio.portfolioId} · {data.portfolio.currency}</p><h2>{data.portfolio.name}</h2><p className="muted">行情快照 · {formatSnapshotTime(data.portfolio.snapshotAt)}</p></div><div className="hero-metrics"><div><span>组合总资产</span><strong><Money value={data.summary.totalAsset} /></strong></div><div><span>现金</span><strong><Money value={data.summary.cash} /></strong></div></div></section>
+      <header className="topbar">
+        <div className="brand-mark" aria-hidden="true">PF</div>
+        <div className="topbar-copy">
+          <p className="eyebrow">PORTFOLIO LAB</p>
+          <h1>投资组合分析</h1>
+        </div>
+        <div className="topbar-context"><span className="live-dot" aria-hidden="true" />固定快照模式</div>
+        <button type="button" className="button button--ghost" onClick={onRefresh}>刷新数据</button>
+      </header>
+      <section className="hero-card">
+        <div className="hero-copy">
+          <p className="eyebrow">{data.portfolio.portfolioId} · {data.portfolio.currency}</p>
+          <h2>{data.portfolio.name}</h2>
+          <p className="muted">行情快照 · {formatSnapshotTime(data.portfolio.snapshotAt)}</p>
+          <div className="hero-status"><span className="status-dot" aria-hidden="true" />后端计算口径已锁定</div>
+        </div>
+        <div className="hero-metrics" aria-label="组合核心指标">
+          <div className="hero-metric hero-metric--primary"><span>组合总资产</span><strong><Money value={data.summary.totalAsset} /></strong><small>含现金与全部持仓</small></div>
+          <div className="hero-metric"><span>现金余额</span><strong><Money value={data.summary.cash} /></strong><small>可用于模拟买入</small></div>
+        </div>
+      </section>
+      <section className="summary-strip" aria-label="组合摘要">
+        <div className="summary-item"><span className="summary-icon summary-icon--blue" aria-hidden="true">◈</span><div><span>持仓标的</span><strong>{data.summary.holdingCount}<small> 个</small></strong></div></div>
+        <div className="summary-item"><span className="summary-icon summary-icon--amber" aria-hidden="true">!</span><div><span>集中度提醒</span><strong className={data.summary.alerts.length > 0 ? 'summary-value--danger' : 'summary-value--safe'}>{data.summary.alerts.length}<small> 项</small></strong></div></div>
+        <div className="summary-item"><span className="summary-icon summary-icon--green" aria-hidden="true">◫</span><div><span>行业分类</span><strong>{data.industries.length}<small> 个</small></strong></div></div>
+        <div className="summary-item summary-item--note"><span>快照编号</span><strong>{data.portfolio.snapshotId}</strong></div>
+      </section>
       <ConcentrationAlerts alerts={data.summary.alerts} />
-      <section className="panel" aria-labelledby="holdings-title"><div className="panel-heading"><div><p className="eyebrow">HOLDINGS</p><h2 id="holdings-title">持仓明细</h2></div><span className="panel-meta">{data.summary.holdingCount} 个标的</span></div>{data.instruments.length > 0 ? <InstrumentTable instruments={data.instruments} /> : <p className="empty-copy">当前没有持仓数据。</p>}</section>
-      <section className="panel" aria-labelledby="industry-title"><div className="panel-heading"><div><p className="eyebrow">INDUSTRY MIX</p><h2 id="industry-title">行业分布</h2></div><span className="panel-meta">现金不计入行业</span></div>{data.industries.length > 0 ? <IndustryTable industries={data.industries} /> : <p className="empty-copy">当前没有行业数据。</p>}</section>
+      <div className="overview-grid">
+        <section className="panel panel--data" aria-labelledby="holdings-title"><div className="panel-heading"><div><p className="eyebrow">HOLDINGS</p><h2 id="holdings-title">持仓明细</h2></div><span className="panel-meta">{data.summary.holdingCount} 个标的</span></div>{data.instruments.length > 0 ? <InstrumentTable instruments={data.instruments} /> : <p className="empty-copy">当前没有持仓数据。</p>}</section>
+        <section className="panel panel--data" aria-labelledby="industry-title"><div className="panel-heading"><div><p className="eyebrow">INDUSTRY MIX</p><h2 id="industry-title">行业分布</h2></div><span className="panel-meta">现金不计入行业</span></div>{data.industries.length > 0 ? <IndustryTable industries={data.industries} /> : <p className="empty-copy">当前没有行业数据。</p>}</section>
+      </div>
       <RebalanceWorkspace portfolio={data} />
-      <footer className="page-footer">快照 {data.portfolio.snapshotId} · 数据由后端统一计算</footer>
+      <footer className="page-footer">快照 {data.portfolio.snapshotId} <span>·</span> 数据由后端统一计算 <span>·</span> 固定价格模拟，不产生真实交易</footer>
     </main>
   );
 }
