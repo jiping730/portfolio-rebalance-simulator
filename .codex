@@ -72,3 +72,9 @@
 - Codex 实际产出：修正设计中的 `SavedScenario` 字段为 `portfolioId`、`snapshotId`、规范化操作、`scenarioId`、`createdAt`；明确 `result` 不落盘、仓储为单进程串行直接写入；补充错误序号 0-based 到页面“第 N 笔”的转换、中文错误标签和过期结果行为；更新 README 六步核心流程和 VERIFY 重启结果。
 - 检查方法：逐项对照 `domain/types.ts`、`scenario-repository.ts`、`api/app.ts`、`App.tsx`、AC-05 重启测试、浏览器验收脚本和四张截图；运行 `npm.cmd test`、`npm.cmd run build`、`git diff --check`，并确认 `apps/server/data/scenarios.json` 为 `[]`。
 - 实际核验结果：文档中的持久化字段、API 响应形状、中文错误展示、`role="alert"`、失败后保留/过期逻辑、服务重启结果与实现一致；测试和构建通过，截图对应实际页面状态。未修改业务代码或测试，只修正文档记录。
+
+### AI 协作记录附录整理
+
+- 用户要求：将最近方案重启、前端交互/截图、文档一致性复核三轮整理为可附在 `DESIGN.md` 的 2～3 个关键交互摘要，不提交完整对话。
+- Codex 处理：在 `DESIGN.md` 新增“最近三轮 AI 协作摘要”，每段统一记录上下文与完成标准、AI 产出、检查方法和采用依据；保留本文件的详细时间线作为补充索引。
+- 实际核验：人工对照实现发现设计曾遗漏 `portfolioId`，且把仓储写入误述为可能使用临时文件替换；核对 `types.ts` 与 `scenario-repository.ts` 后修正文档，并以 30/30 测试、生产构建、浏览器脚本和四张截图复核结论。
