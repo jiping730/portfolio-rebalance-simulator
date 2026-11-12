@@ -680,7 +680,22 @@ tbody tr:last-child td {
 }
 
 .comparison-table-wrap table {
-  min-width: 600px;
+  min-width: 1120px;
+  font-size: 0.78rem;
+}
+
+.holdings-comparison-heading {
+  margin: 22px 0 8px;
+  padding: 0 2px;
+}
+
+.holdings-comparison-heading h3 {
+  font-size: 0.94rem;
+}
+
+.holdings-comparison-heading > span {
+  color: #71809a;
+  font-size: 0.72rem;
 }
 
 .delta-positive {

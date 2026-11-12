@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, cleanup } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, cleanup, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PortfolioAnalysis, PortfolioOverview, ScenarioDetail, SimulationResult } from './api';
 import App from './App';
@@ -140,6 +140,13 @@ describe('portfolio interaction flow', () => {
     fireEvent.click(screen.getByRole('button', { name: '提交模拟' }));
     expect(await screen.findByText(/总资产守恒：100000\.00 → 100000\.00/)).toBeInTheDocument();
     expect(screen.getByText('行业集中度对比')).toBeInTheDocument();
+    expect(screen.getByText('持仓明细对比')).toBeInTheDocument();
+    const holdingsComparison = screen.getByRole('table', { name: '模拟持仓明细对比' });
+    expect(within(holdingsComparison).getByRole('columnheader', { name: '模拟占比' })).toBeInTheDocument();
+    expect(within(holdingsComparison).getByRole('columnheader', { name: '占比变化' })).toBeInTheDocument();
+    expect(within(holdingsComparison).getByRole('columnheader', { name: '模拟状态' })).toBeInTheDocument();
+    expect(within(holdingsComparison).getByText('-10.00%')).toBeInTheDocument();
+    expect(within(holdingsComparison).getByText('25.00%')).toBeInTheDocument();
     expect(screen.getByText('55.00%')).toBeInTheDocument();
   });
 

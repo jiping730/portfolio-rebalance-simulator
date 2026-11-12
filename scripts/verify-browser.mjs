@@ -2,8 +2,8 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
 const cdpEndpoint = process.env.CDP_ENDPOINT ?? 'http://127.0.0.1:9222';
-const appUrl = process.env.APP_URL ?? 'http://127.0.0.1:5173';
-const screenshotDirectory = resolve('docs/screenshots');
+const appUrl = process.env.APP_URL ?? 'http://localhost:5173';
+const screenshotDirectory = resolve(process.env.SCREENSHOT_DIR ?? 'docs/screenshots');
 const scenarioFile = resolve(process.env.SCENARIO_FILE ?? 'apps/server/data/scenarios.json');
 const waitTimeoutAttempts = 200;
 const pollIntervalMilliseconds = 100;
@@ -67,8 +67,9 @@ async function waitForApp() {
 }
 
 async function reloadAndWait() {
-  await call('Page.reload', { ignoreCache: true });
+  await call('Page.navigate', { url: appUrl });
   await waitForApp();
+  await sleep(100);
 }
 
 async function setFormValue(selector, value) {
@@ -132,16 +133,29 @@ async function readPageState() {
   })})()`);
 }
 
-async function captureScreenshot(fileName) {
+async function captureContentRange(fileName, startSelector, endSelector) {
+  const range = await evaluate(pageFunction(function getContentRange(firstSelector, lastSelector, padding) {
+    const first = firstSelector ? document.querySelector(firstSelector)?.getBoundingClientRect() : { top: 0, left: 0 };
+    const last = document.querySelector(lastSelector)?.getBoundingClientRect();
+    if (!last) throw new Error(`找不到截图范围元素：${lastSelector}`);
+    const scrollX = window.scrollX;
+    const scrollY = window.scrollY;
+    const documentWidth = Math.max(document.documentElement.scrollWidth, document.body.scrollWidth);
+    const left = Math.max(0, (first?.left ?? 0) + scrollX - padding);
+    const top = Math.max(0, (first?.top ?? 0) + scrollY - padding);
+    const right = Math.min(documentWidth, last.right + scrollX + padding);
+    const bottom = Math.min(document.documentElement.scrollHeight, last.bottom + scrollY + padding);
+    return { x: left, y: top, width: Math.max(1, right - left), height: Math.max(1, bottom - top) };
+  }, startSelector, endSelector, 18));
   const metrics = await call('Page.getLayoutMetrics');
   const contentSize = metrics.cssContentSize ?? metrics.contentSize;
-  const width = Math.min(Math.max(contentSize.width, 1), 1440);
-  const height = Math.max(contentSize.height, 1);
+  const width = Math.min(Math.max(range.width, 1), Math.max(contentSize.width, 1), 1440);
+  const height = Math.min(Math.max(range.height, 1), Math.max(contentSize.height, 1));
   const screenshot = await call('Page.captureScreenshot', {
     format: 'png',
     fromSurface: true,
     captureBeyondViewport: true,
-    clip: { x: 0, y: 0, width, height, scale: 1 },
+    clip: { x: range.x, y: range.y, width, height, scale: 1 },
   });
   await writeFile(resolve(screenshotDirectory, fileName), Buffer.from(screenshot.data, 'base64'));
 }
@@ -177,36 +191,83 @@ try {
   assertIncludes(initial.text, '2 项超限', '初始页面');
   assertIncludes(initial.text, '星河科技', '初始页面');
   assertIncludes(initial.text, '科技行业', '初始页面');
-  await captureScreenshot('overview.png');
+  await captureContentRange('ac-01-overview.png', null, '.alert-panel');
 
   await addOperation('sell', 'A01', 100);
+  const boundarySimulation = await submitSimulation();
+  const boundary = await readPageState();
+  if (!boundarySimulation.hasComparison || boundary.operationCount !== 1) throw new Error('AC-02 未展示一笔卖出操作和对比结果');
+  assertIncludes(boundary.text, '现金 ¥30000.00 · 0 项提醒', 'AC-02');
+  assertIncludes(boundary.text, '持仓明细对比', 'AC-02');
+  assertIncludes(boundary.text, 'A01 · 星河科技', 'AC-02');
+  assertIncludes(boundary.text, '30.00%', 'AC-02');
+  assertIncludes(boundary.text, '50.00%', 'AC-02');
+  await captureContentRange('ac-02-threshold-boundary.png', '.simulation-panel', '.comparison-area');
+
   await addOperation('buy', 'A02', 100);
   const successfulSimulation = await submitSimulation();
   const simulation = await readPageState();
-  if (!successfulSimulation.hasComparison || simulation.operationCount !== 2) throw new Error('成功模拟未展示两笔操作和对比结果');
-  assertIncludes(simulation.text, '行业集中度对比', '模拟结果');
-  assertIncludes(simulation.text, '总资产守恒：100000.00 → 100000.00', '模拟结果');
-  assertIncludes(simulation.text, '55.00%', '模拟结果');
-  await captureScreenshot('simulation-comparison.png');
+  if (!successfulSimulation.hasComparison || simulation.operationCount !== 2) throw new Error('AC-03 未展示两笔操作和对比结果');
+  assertIncludes(simulation.text, '行业集中度对比', 'AC-03');
+  assertIncludes(simulation.text, '总资产守恒：100000.00 → 100000.00', 'AC-03');
+  assertIncludes(simulation.text, '现金 ¥25000.00', 'AC-03');
+  assertIncludes(simulation.text, '55.00%', 'AC-03');
+  assertIncludes(simulation.text, '持仓明细对比', 'AC-03');
+  assertIncludes(simulation.text, '模拟占比', 'AC-03');
+  assertIncludes(simulation.text, '占比变化', 'AC-03');
+  assertIncludes(simulation.text, '-10.00%', 'AC-03');
+  assertIncludes(simulation.text, '25.00%', 'AC-03');
+  assertIncludes(simulation.text, '模拟状态', 'AC-03');
+  await captureContentRange('ac-03-continuous-operations.png', '.simulation-panel', '.comparison-area');
+
+  await reloadAndWait();
+  await addOperation('buy', 'A01', 201);
+  const failedCashSimulation = await submitSimulation();
+  const error = await readPageState();
+  assertIncludes(error.alertText ?? '', '现金不足', 'AC-04');
+  assertIncludes(error.alertText ?? '', '第 1 笔操作失败', 'AC-04');
+  if (error.alertRole !== 'alert' || failedCashSimulation.hasComparison || error.hasComparison) {
+    throw new Error('AC-04 现金不足未被拒绝或错误后产生了模拟结果');
+  }
+  await captureContentRange('ac-04-invalid-operation.png', '.workspace-layout', '.scenario-list');
+
+  await reloadAndWait();
+  await addOperation('sell', 'A01', 401);
+  const failedHoldingSimulation = await submitSimulation();
+  const holdingError = await readPageState();
+  assertIncludes(holdingError.alertText ?? '', '持仓不足', 'AC-04 超卖');
+  assertIncludes(holdingError.alertText ?? '', '第 1 笔操作失败', 'AC-04 超卖');
+  if (failedHoldingSimulation.hasComparison || holdingError.hasComparison) throw new Error('AC-04 超卖未被拒绝');
 
   await reloadAndWait();
   await addOperation('sell', 'A01', 100);
-  await submitSimulation();
+  const previousSuccessfulSimulation = await submitSimulation();
   await addOperation('sell', 'A01', 301);
-  const failedSimulation = await submitSimulation();
-  const error = await readPageState();
-  assertIncludes(error.alertText ?? '', '持仓不足', '错误反馈');
-  assertIncludes(error.alertText ?? '', '第 2 笔操作失败', '错误反馈');
-  if (error.alertRole !== 'alert' || !failedSimulation.hasComparison || !error.hasStaleNote || !error.saveDisabled) {
-    throw new Error('错误后未保留成功结果、过期提示或保存禁用状态');
+  const failedSecondSimulation = await submitSimulation();
+  const secondOperationError = await readPageState();
+  assertIncludes(secondOperationError.alertText ?? '', '持仓不足', 'AC-04 第二笔失败');
+  assertIncludes(secondOperationError.alertText ?? '', '第 2 笔操作失败', 'AC-04 第二笔失败');
+  if (!previousSuccessfulSimulation.hasComparison || !failedSecondSimulation.hasComparison || !secondOperationError.hasStaleNote || !secondOperationError.saveDisabled) {
+    throw new Error('AC-04 第二笔失败未保留上次结果或禁用保存');
   }
-  await captureScreenshot('error-feedback.png');
+
+  await reloadAndWait();
+  for (const invalidQuantity of [0, -1, 1.5]) {
+    await setFormValue(selectors.tradeQuantity, invalidQuantity);
+    await clickButton('加入操作');
+    const quantityError = await readPageState();
+    assertIncludes(quantityError.alertText ?? '', '交易数量必须为正整数', `AC-04 数量 ${invalidQuantity}`);
+  }
 
   await reloadAndWait();
   await addOperation('sell', 'A01', 100);
   await addOperation('buy', 'A02', 100);
-  await submitSimulation();
-  await setFormValue(selectors.scenarioName, '浏览器交互验收方案');
+  const persistenceSimulation = await submitSimulation();
+  const persistence = await readPageState();
+  if (!persistenceSimulation.hasComparison || persistence.operationCount !== 2) throw new Error('AC-05 保存前模拟未成功');
+  assertIncludes(persistence.text, '现金 ¥25000.00', 'AC-05');
+  assertIncludes(persistence.text, '总资产守恒：100000.00 → 100000.00', 'AC-05');
+  await setFormValue(selectors.scenarioName, 'AC-05 持久化验收');
   await clickButton('保存方案');
   const saved = await evaluate(pageFunction(async function waitForSavedScenario(maxAttempts, interval) {
     for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
@@ -216,7 +277,7 @@ try {
     }
     throw new Error('方案未保存成功');
   }, waitTimeoutAttempts, pollIntervalMilliseconds));
-  assertIncludes(saved, '浏览器交互验收方案', '方案保存');
+  assertIncludes(saved, 'AC-05 持久化验收', 'AC-05 方案保存');
   await clickButton('重新打开');
   const reopened = await evaluate(pageFunction(async function waitForReopenedScenario(maxAttempts, interval) {
     for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
@@ -226,12 +287,14 @@ try {
     }
     throw new Error('方案未重新打开成功');
   }, waitTimeoutAttempts, pollIntervalMilliseconds));
-  assertIncludes(reopened.message, '浏览器交互验收方案', '方案重开');
+  assertIncludes(reopened.message, 'AC-05 持久化验收', 'AC-05 方案重开');
   if (reopened.operationCount !== 2) throw new Error('方案重开后的操作数量不是 2');
   assertIncludes(reopened.text, '总资产守恒：100000.00 → 100000.00', '方案重开');
-  await captureScreenshot('scenario-reopened.png');
+  assertIncludes(reopened.text, 'A01 · 星河科技', 'AC-05 方案重开');
+  assertIncludes(reopened.text, 'A02 · 云帆软件', 'AC-05 方案重开');
+  await captureContentRange('ac-05-scenario-reopened.png', '.comparison-area', '.scenario-list');
 
-  console.log(JSON.stringify({ initial, simulation, error, reopened }, null, 2));
+  console.log(JSON.stringify({ initial, boundary, simulation, error, reopened }, null, 2));
 } finally {
   await writeFile(scenarioFile, originalScenarioContent, 'utf8');
   if (socket) socket.close();

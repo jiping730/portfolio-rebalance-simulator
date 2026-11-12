@@ -209,14 +209,34 @@ function SimulationComparison({ result, stale }: { result: SimulationResult; sta
       <div className="invariant-note"><span aria-hidden="true">✓</span> 总资产守恒：{result.invariant.originalTotalAsset} → {result.invariant.simulatedTotalAsset}</div>
       {stale && <div className="stale-note" role="status">当前操作列表已变化，以上为上一次成功模拟结果，请重新提交后再保存。</div>}
       <ConcentrationComparison original={result.original} simulated={result.simulated} />
+      <div className="comparison-section-heading holdings-comparison-heading">
+        <div><p className="eyebrow">HOLDINGS DELTA</p><h3>持仓明细对比</h3></div>
+        <span>模拟结果</span>
+      </div>
       <div className="table-wrap comparison-table-wrap">
-        <table>
-          <thead><tr><th>标的</th><th>原始持仓</th><th>模拟持仓</th><th>变化</th><th>模拟市值</th></tr></thead>
+        <table aria-label="模拟持仓明细对比">
+          <thead><tr><th>标的</th><th>行业</th><th>原始持仓</th><th>模拟持仓</th><th>数量变化</th><th>模拟市值</th><th>原始占比</th><th>模拟占比</th><th>占比变化</th><th>阈值</th><th>模拟状态</th></tr></thead>
           <tbody>
             {result.simulated.instruments.map((instrument) => {
               const original = originalBySymbol.get(instrument.symbol);
               const delta = instrument.quantity - (original?.quantity ?? 0);
-              return <tr key={instrument.symbol}><td className="primary-cell">{instrument.symbol} · {instrument.name}</td><td>{original?.quantity ?? 0}</td><td>{instrument.quantity}</td><td className={delta === 0 ? '' : delta > 0 ? 'delta-positive' : 'delta-negative'}>{formatSigned(delta)}</td><td><Money value={instrument.marketValue} /></td></tr>;
+              const originalRatio = original?.ratioPercent ?? '0.00';
+              const ratioChange = Number(instrument.ratioPercent) - Number(originalRatio);
+              return (
+                <tr key={instrument.symbol}>
+                  <td className="primary-cell">{instrument.symbol} · {instrument.name}</td>
+                  <td>{instrument.industry}</td>
+                  <td>{original?.quantity ?? 0}</td>
+                  <td>{instrument.quantity}</td>
+                  <td className={delta === 0 ? '' : delta > 0 ? 'delta-positive' : 'delta-negative'}>{formatSigned(delta)}</td>
+                  <td><Money value={instrument.marketValue} /></td>
+                  <td>{originalRatio}%</td>
+                  <td>{instrument.ratioPercent}%</td>
+                  <td className={ratioChange === 0 ? '' : ratioChange > 0 ? 'delta-positive' : 'delta-negative'}>{formatPercentChange(originalRatio, instrument.ratioPercent)}</td>
+                  <td>{instrument.thresholdPercent}%</td>
+                  <td><AlertBadge active={instrument.isOverThreshold} /></td>
+                </tr>
+              );
             })}
           </tbody>
         </table>

@@ -1,6 +1,6 @@
 # 验证记录
 
-验证日期：2026-11-11
+验证日期：2026-11-12
 验证环境：Windows、Node.js 22.23.1、npm、Chrome 155 Headless、本地开发服务
 
 ## 1. 自动化检查
@@ -25,7 +25,7 @@ npm.cmd run build
 npm.cmd run verify:browser
 ```
 
-实际结果：通过，退出码为 `0`。Chrome 155 Headless 通过 CDP 完成初始页面、AC-03 模拟、第二笔失败反馈、方案保存和重新打开四段流程，并重新生成四张截图。
+实际结果：通过，退出码为 `0`。Chrome 155 Headless 通过 CDP 完成 AC-01 初始组合、AC-02 阈值边界、AC-03 连续操作、AC-04 无效操作和 AC-05 方案保存/重开五段流程，并生成五张聚焦截图。
 
 新增验收测试位于 `apps/server/src/acceptance.test.ts`，使用临时方案目录，不污染默认 `apps/server/data/scenarios.json`。
 
@@ -51,15 +51,15 @@ npm.cmd run verify:browser
 
 ## 3. 浏览器验证
 
-启动后端和前端开发服务后，在本机 Chrome 中访问 `http://127.0.0.1:5173`，执行以下步骤：
+启动后端和前端开发服务后，在本机 Chrome 中访问 `http://localhost:5173`，执行以下步骤：
 
 1. 验证初始页面显示“投资组合分析”、总资产 `¥100000.00` 和“2 项超限”，其中包括星河科技 40% 与科技行业 60%。
 2. 添加“卖出 A01 100 股”和“买入 A02 100 股”，点击“提交模拟”。
 3. 验证对比区显示原始/模拟组合均为 `¥100000.00`，现金变为 `¥25000.00`，并显示“总资产守恒：100000.00 → 100000.00”。
-4. 验证 A01 变化为 `-100`、A02 变化为 `+100`，模拟组合剩余 1 项提醒；行业集中度对比表显示科技行业从 `60.00%` 变为 `55.00%`，变化 `-5.00%`，阈值 `50.00%`，状态为“超限”。
+4. 验证持仓明细对比表显示 A01/A02 的原始持仓、模拟持仓、数量变化、模拟市值、原始/模拟占比、占比变化、阈值和模拟状态；其中 A01 占比从 `40.00%` 变为 `30.00%`、变化 `-10.00%`、阈值 `30.00%`、状态为“正常”，A02 占比从 `20.00%` 变为 `25.00%`、变化 `+5.00%`。同时验证行业集中度对比表显示科技行业从 `60.00%` 变为 `55.00%`，变化 `-5.00%`，阈值 `50.00%`，状态为“超限”。
 5. 保存方案“降低科技集中度验收”，验证列表出现 1 个方案；点击“重新打开”，验证提示和两笔操作仍在，守恒提示仍存在。
 
-浏览器验证使用本地 Chrome DevTools Protocol 执行页面操作，未访问外部网站。验证后将演示产生的临时方案恢复为 `apps/server/data/scenarios.json` 中的 `[]`，保持仓库初始状态。
+浏览器验证使用本地 Chrome DevTools Protocol 执行页面操作，未访问外部网站。脚本会在运行期间使用空方案列表，结束后恢复 `apps/server/data/scenarios.json` 的原始内容。
 
 ### 3.1 可重复浏览器交互脚本
 
@@ -69,14 +69,15 @@ npm.cmd run verify:browser
 npm.cmd run verify:browser
 ```
 
-脚本通过 Chrome DevTools Protocol 实际执行并断言：初始页面的 2 项集中度提醒；卖出 A01 100 股、买入 A02 100 股、提交模拟和行业集中度对比；第一次模拟成功后第二笔超卖失败时错误中文提示、`第 2 笔操作失败`、`role="alert"`、旧结果保留、过期提示和保存禁用；成功保存方案后重新打开并核对两笔操作和总资产守恒。脚本使用 `data-testid` 定位表单控件、使用 `aria-label` 定位操作按钮，等待异步页面状态最多 20 秒，并在 `finally` 中恢复运行前的方案文件内容。本次实际退出码为 `0`，生成以下四张截图：
+脚本通过 Chrome DevTools Protocol 实际执行并断言：AC-01 初始页面的 2 项集中度提醒；AC-02 卖出 A01 100 股后的 `30.00%/50.00%` 边界和提醒解除；AC-03 买入 A02 100 股后的现金、总资产守恒、行业集中度以及持仓明细中的模拟占比/占比变化/状态；AC-04 的现金不足、超卖、第二笔失败保留旧结果，以及零、负数和小数数量校验；AC-05 保存方案后重新打开并核对两笔操作和总资产守恒。脚本使用 `data-testid` 定位表单控件、使用 `aria-label` 定位操作按钮，等待异步页面状态最多 20 秒，并在 `finally` 中恢复运行前的方案文件内容。本次实际退出码为 `0`，生成以下五张截图：
 
-- `screenshots/overview.png`
-- `screenshots/simulation-comparison.png`
-- `screenshots/error-feedback.png`
-- `screenshots/scenario-reopened.png`
+- `screenshots/ac-01-overview.png`
+- `screenshots/ac-02-threshold-boundary.png`
+- `screenshots/ac-03-continuous-operations.png`
+- `screenshots/ac-04-invalid-operation.png`
+- `screenshots/ac-05-scenario-reopened.png`
 
-本次运行前后的 `apps/server/data/scenarios.json` 均为空数组 `[]`。
+本次运行期间的 `apps/server/data/scenarios.json` 为空数组 `[]`，结束后恢复运行前内容。
 
 ### 3.2 调仓校验错误反馈
 
@@ -92,10 +93,11 @@ npm.cmd run verify:browser
 
 ## 4. 关键截图
 
-- [初始组合概览](screenshots/overview.png)：总资产、现金、集中度提醒和持仓明细。
-- [调仓结果对比](screenshots/simulation-comparison.png)：两笔操作、行业集中度变化、模拟结果、持仓变化及守恒提示。
-- [错误反馈](screenshots/error-feedback.png)：第二笔超卖失败、中文提示、失败序号、旧结果和过期状态。
-- [方案重新打开](screenshots/scenario-reopened.png)：重开提示、方案列表和相同的模拟结果。
+- [AC-01 初始组合](screenshots/ac-01-overview.png)：总资产、现金、集中度提醒和初始持仓。
+- [AC-02 阈值边界](screenshots/ac-02-threshold-boundary.png)：卖出 A01 后的现金、持仓占比和提醒解除。
+- [AC-03 连续操作](screenshots/ac-03-continuous-operations.png)：买卖两笔操作、行业集中度和持仓明细占比/状态对比。
+- [AC-04 无效操作](screenshots/ac-04-invalid-operation.png)：现金不足错误、失败序号和操作约束入口。
+- [AC-05 方案重开](screenshots/ac-05-scenario-reopened.png)：保存提示、方案列表、重开结果和总资产守恒。
 
 ## 5. 文档一致性检查
 

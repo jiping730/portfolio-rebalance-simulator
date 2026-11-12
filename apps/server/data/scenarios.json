@@ -1,1 +1,38 @@
-[]
+[
+  {
+    "name": "本地页面闭环验收",
+    "portfolioId": "DEMO-001",
+    "snapshotId": "SNAP-20261102",
+    "operations": [
+      {
+        "order": 1,
+        "side": "sell",
+        "symbol": "A01",
+        "quantity": 100
+      },
+      {
+        "order": 2,
+        "side": "buy",
+        "symbol": "A02",
+        "quantity": 100
+      }
+    ],
+    "scenarioId": "SCN-3aaf07cb-4a49-48cb-8595-ea429e3618a7",
+    "createdAt": "2026-11-11T09:01:46.488Z"
+  },
+  {
+    "name": "解决超限问题",
+    "portfolioId": "DEMO-001",
+    "snapshotId": "SNAP-20261102",
+    "operations": [
+      {
+        "order": 1,
+        "side": "sell",
+        "symbol": "A01",
+        "quantity": 100
+      }
+    ],
+    "scenarioId": "SCN-6c4244a6-b092-49e9-bfcc-067c86c52490",
+    "createdAt": "2026-11-12T01:59:08.086Z"
+  }
+]

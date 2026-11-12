@@ -80,14 +80,14 @@ npm run verify:browser
 
 本项目不包含真实交易服务或生产服务器启动脚本；`build` 用于验证可编译和生成前端 `dist` 产物，开发环境按上面的两个命令启动即可。
 
-浏览器验收需要 Chrome/Chromium 以远程调试端口 `9222` 启动；脚本会实际操作页面、生成四张截图，并在结束时恢复方案文件原内容。
+浏览器验收需要 Chrome/Chromium 以远程调试端口 `9222` 启动；脚本会实际操作页面、生成 AC-01～AC-05 五张截图，并在结束时恢复方案文件原内容。
 
 ## 核心操作流程
 
 1. 加载固定组合快照，查看总资产、现金、持仓明细、行业分布和集中度提醒。
 2. 在“调仓模拟”中选择买入或卖出、标的和正整数数量，点击“加入操作”。
 3. 按需要加入多笔操作，列表中的序号表示实际执行顺序。
-4. 点击“提交模拟”，查看原始/模拟现金、持仓变化、行业集中度对比和总资产守恒。
+4. 点击“提交模拟”，查看原始/模拟现金、持仓数量与市值变化、持仓占比变化及状态、行业集中度对比和总资产守恒。
 5. 如果校验失败，页面显示中文错误说明和“第 N 笔操作失败”；上一次成功结果会保留，当前操作列表会标记为过期并禁止保存。
 
 ### 保存和重新打开方案
@@ -123,10 +123,11 @@ docs/screenshots                      关键页面验证截图
 - [验证记录](docs/VERIFY.md)：自动化测试、AC-01～AC-05、浏览器操作和已知问题。
 - [设计与交付说明](docs/DESIGN.md)：需求拆解、接口、关键取舍、AI 协作记录和复盘。
 - [初始开工方案](docs/PLAN.md)：开发前保留的范围、技术选择和验证计划。
-- [概览截图](docs/screenshots/overview.png)
-- [调仓结果截图](docs/screenshots/simulation-comparison.png)
-- [错误反馈截图](docs/screenshots/error-feedback.png)
-- [方案重开截图](docs/screenshots/scenario-reopened.png)
+- [AC-01 初始组合](docs/screenshots/ac-01-overview.png)
+- [AC-02 阈值边界](docs/screenshots/ac-02-threshold-boundary.png)
+- [AC-03 连续操作](docs/screenshots/ac-03-continuous-operations.png)
+- [AC-04 无效操作](docs/screenshots/ac-04-invalid-operation.png)
+- [AC-05 方案重开](docs/screenshots/ac-05-scenario-reopened.png)
 
 ## 已知限制
 
